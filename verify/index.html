@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Verify Ticket - EKINTABULE</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+    <script src="../shared/firebase-config.js"></script>
+</head>
+<body>
+    <div class="container" id="container">
+        <!-- Loading State -->
+        <div id="loadingState" class="state loading-state">
+            <div class="spinner"></div>
+            <h1>Checking Ticket...</h1>
+            <p>Please wait</p>
+        </div>
+
+        <!-- Valid Ticket -->
+        <div id="validState" class="state valid-state" style="display: none;">
+            <div class="icon">✅</div>
+            <h1>VALID TICKET</h1>
+            <p class="subtitle">Entry Approved!</p>
+            <div class="ticket-info" id="validTicketInfo"></div>
+            <div class="timestamp" id="validTimestamp"></div>
+        </div>
+
+        <!-- Invalid Ticket -->
+        <div id="invalidState" class="state invalid-state" style="display: none;">
+            <div class="icon">❌</div>
+            <h1>INVALID TICKET</h1>
+            <p class="subtitle">This ticket does not exist</p>
+            <div class="scanned-value" id="scannedValue"></div>
+        </div>
+
+        <!-- Already Used -->
+        <div id="usedState" class="state used-state" style="display: none;">
+            <div class="icon">⚠️</div>
+            <h1>ALREADY USED</h1>
+            <p class="subtitle">This ticket was already scanned</p>
+            <div class="ticket-info" id="usedTicketInfo"></div>
+            <div class="warning-text">⚠️ Possible duplicate entry attempt</div>
+        </div>
+
+        <!-- Error/No Ticket State -->
+        <div id="errorState" class="state error-state" style="display: none;">
+            <div class="icon">🎫</div>
+            <h1>NO TICKET</h1>
+            <p class="subtitle" id="errorMessage">No ticket ID provided</p>
+            <p>Please scan a valid QR code</p>
+            <button class="btn" onclick="location.reload()">Try Again</button>
+        </div>
+
+        <!-- No Ticket State (landing page) -->
+        <div id="noTicketState" class="state error-state" style="display: none;">
+            <div class="icon">🎫</div>
+            <h1>EKINTABULE</h1>
+            <p class="subtitle">Kya Christmas 2025</p>
+            <p>Scan a ticket QR code to verify</p>
+            <div class="manual-entry">
+                <input type="text" id="manualTicketId" placeholder="Enter ticket ID (e.g., EKC-2025-0001)">
+                <button class="btn" onclick="verifyManualTicket()">Verify</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="verify.js"></script>
+</body>
+</html>
