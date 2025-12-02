@@ -1,19 +1,13 @@
-<! DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Verify Ticket - EKINTABULI</title>
-    <link href="https://fonts. googleapis.com/css2?family=Playfair+Display:wght@700&family=Montserrat:wght@400;600;700&display=swap" rel="stylesheet">
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-        
+        * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
-            font-family: 'Montserrat', sans-serif;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
             min-height: 100vh;
             display: flex;
@@ -22,124 +16,80 @@
             padding: 20px;
             color: white;
         }
-        
-        .container {
-            max-width: 450px;
-            width: 100%;
-        }
-        
+        .container { max-width: 450px; width: 100%; }
         .card {
             background: rgba(26, 26, 46, 0.95);
             border-radius: 20px;
             padding: 30px;
-            border: 2px solid rgba(212, 175, 55, 0. 3);
+            border: 2px solid rgba(212, 175, 55, 0.3);
             box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
             text-align: center;
         }
-        
-        .logo {
-            font-family: 'Playfair Display', serif;
-            font-size: 32px;
-            color: #D4AF37;
-            margin-bottom: 5px;
+        .logo { font-size: 32px; color: #D4AF37; margin-bottom: 5px; font-weight: bold; }
+        .subtitle { color: #888; font-size: 14px; margin-bottom: 30px; }
+        .connection-status {
+            font-size: 11px;
+            padding: 5px 12px;
+            border-radius: 20px;
+            margin-bottom: 20px;
+            display: inline-block;
         }
-        
-        .subtitle {
-            color: #888;
-            font-size: 14px;
-            margin-bottom: 30px;
+        .connection-status.online {
+            background: rgba(40, 167, 69, 0. 2);
+            color: #28a745;
+            border: 1px solid rgba(40, 167, 69, 0.3);
         }
-        
-        .status-icon {
-            font-size: 80px;
-            margin: 20px 0;
+        .connection-status.offline {
+            background: rgba(253, 126, 20, 0.2);
+            color: #fd7e14;
+            border: 1px solid rgba(253, 126, 20, 0.3);
         }
-        
-        .status-text {
-            font-size: 24px;
-            font-weight: 700;
-            margin-bottom: 10px;
-        }
-        
-        . status-valid { color: #28a745; }
+        .status-icon { font-size: 80px; margin: 20px 0; }
+        .status-text { font-size: 24px; font-weight: 700; margin-bottom: 10px; }
+        .status-valid { color: #28a745; }
         .status-invalid { color: #dc3545; }
-        . status-used { color: #fd7e14; }
+        .status-used { color: #fd7e14; }
         .status-checking { color: #17a2b8; }
-        
         .ticket-info {
-            background: rgba(0, 0, 0, 0.3);
+            background: rgba(0, 0, 0, 0. 3);
             border-radius: 12px;
             padding: 20px;
             margin: 20px 0;
             text-align: left;
         }
-        
         .info-row {
             display: flex;
             justify-content: space-between;
             padding: 10px 0;
             border-bottom: 1px solid rgba(255, 255, 255, 0. 1);
         }
-        
-        . info-row:last-child {
-            border-bottom: none;
-        }
-        
-        .info-label {
-            color: #888;
-            font-size: 12px;
-        }
-        
-        .info-value {
-            font-weight: 600;
-            color: #D4AF37;
-        }
-        
-        .message {
-            padding: 15px;
-            border-radius: 10px;
-            margin-top: 20px;
-            font-size: 14px;
-        }
-        
+        .info-row:last-child { border-bottom: none; }
+        .info-label { color: #888; font-size: 12px; }
+        .info-value { font-weight: 600; color: #D4AF37; }
+        .message { padding: 15px; border-radius: 10px; margin-top: 20px; font-size: 14px; }
         .message-success {
-            background: rgba(40, 167, 69, 0. 2);
+            background: rgba(40, 167, 69, 0.2);
             border: 1px solid #28a745;
             color: #28a745;
         }
-        
         .message-error {
-            background: rgba(220, 53, 69, 0.2);
+            background: rgba(220, 53, 69, 0. 2);
             border: 1px solid #dc3545;
             color: #dc3545;
         }
-        
-        . message-warning {
-            background: rgba(253, 126, 20, 0.2);
+        .message-warning {
+            background: rgba(253, 126, 20, 0. 2);
             border: 1px solid #fd7e14;
             color: #fd7e14;
         }
-        
         .gate-section {
             margin-top: 30px;
             padding-top: 20px;
-            border-top: 1px solid rgba(212, 175, 55, 0.2);
+            border-top: 1px solid rgba(212, 175, 55, 0. 2);
         }
-        
-        .gate-title {
-            color: #888;
-            font-size: 12px;
-            margin-bottom: 15px;
-        }
-        
-        . pin-input {
-            display: flex;
-            gap: 10px;
-            justify-content: center;
-            margin-bottom: 15px;
-        }
-        
-        . pin-input input {
+        .gate-title { color: #888; font-size: 12px; margin-bottom: 15px; }
+        .pin-input { display: flex; gap: 10px; justify-content: center; margin-bottom: 15px; }
+        .pin-input input {
             width: 50px;
             height: 50px;
             text-align: center;
@@ -150,12 +100,7 @@
             background: rgba(0, 0, 0, 0. 3);
             color: white;
         }
-        
-        .pin-input input:focus {
-            outline: none;
-            border-color: #D4AF37;
-        }
-        
+        .pin-input input:focus { outline: none; border-color: #D4AF37; }
         .btn {
             padding: 15px 30px;
             border-radius: 10px;
@@ -166,50 +111,48 @@
             width: 100%;
             transition: all 0.3s;
         }
-        
         .btn-primary {
             background: linear-gradient(135deg, #D4AF37, #8B4513);
             color: white;
         }
-        
         .btn-primary:hover {
             transform: translateY(-2px);
             box-shadow: 0 5px 20px rgba(212, 175, 55, 0. 4);
         }
-        
-        .btn-primary:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-            transform: none;
+        .btn-primary:disabled { opacity: 0. 5; cursor: not-allowed; transform: none; }
+        .btn-danger {
+            background: linear-gradient(135deg, #dc3545, #a71d2a);
+            color: white;
+            margin-top: 10px;
         }
-        
-        .footer {
-            margin-top: 20px;
-            font-size: 11px;
-            color: #666;
-        }
-        
+        .footer { margin-top: 20px; font-size: 11px; color: #666; }
         .spinner {
             width: 60px;
             height: 60px;
-            border: 4px solid rgba(212, 175, 55, 0.2);
+            border: 4px solid rgba(212, 175, 55, 0. 2);
             border-top-color: #D4AF37;
             border-radius: 50%;
             animation: spin 1s linear infinite;
             margin: 30px auto;
         }
-        
-        @keyframes spin {
-            to { transform: rotate(360deg); }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .scan-count {
+            background: rgba(212, 175, 55, 0. 1);
+            border: 1px solid rgba(212, 175, 55, 0.3);
+            border-radius: 8px;
+            padding: 10px;
+            margin-top: 15px;
+            font-size: 12px;
+            color: #D4AF37;
         }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="card">
-            <div class="logo">👑 EKINTABULI</div>
+            <div class="logo">EKINTABULI</div>
             <div class="subtitle">Kya Christmas 2025 - Ticket Verification</div>
-            
+            <div class="connection-status offline" id="connectionStatus">Connecting...</div>
             <div id="content">
                 <div class="spinner"></div>
                 <p class="status-text status-checking">Verifying ticket...</p>
@@ -217,278 +160,357 @@
         </div>
     </div>
 
-    <script src="https://www.gstatic.com/firebasejs/9. 22.0/firebase-app-compat.js"></script>
-    <script src="https://www. gstatic.com/firebasejs/9.22.0/firebase-firestore-compat. js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
     <script src="../shared/firebase-config.js"></script>
+    
     <script>
-        const CONFIG = {
+        var CONFIG = {
             secretKey: 'EKINTABULI-2025-XMAS-SECRET',
-            gatePin: '2025' // PIN for gate staff to validate
+            gatePin: '2025',
+            eventName: 'EKINTABULI Kya Christmas',
+            eventDate: '25th December 2025',
+            eventVenue: 'Club Missouka'
         };
         
-        let currentTicket = null;
-        let ticketData = null;
+        var currentTicket = null;
+        var ticketData = null;
+        var isFirebaseConnected = false;
         
         document.addEventListener('DOMContentLoaded', function() {
-            const urlParams = new URLSearchParams(window.location.search);
-            const encryptedCode = urlParams.get('t');
-            
-            if (! encryptedCode) {
-                showError('No ticket code provided', 'Please scan a valid ticket QR code.');
-                return;
-            }
-            
-            verifyTicket(encryptedCode);
+            console.log('EKINTABULI Ticket Verification System');
+            checkFirebaseConnection(). then(function() {
+                var urlParams = new URLSearchParams(window.location.search);
+                var encryptedCode = urlParams.get('t');
+                if (! encryptedCode) {
+                    showError('No Ticket Code', 'Please scan a valid ticket QR code.');
+                    return;
+                }
+                verifyTicket(encryptedCode);
+            });
         });
+        
+        function checkFirebaseConnection() {
+            return new Promise(function(resolve) {
+                var statusEl = document.getElementById('connectionStatus');
+                if (typeof firebase !== 'undefined' && typeof db !== 'undefined' && db !== null) {
+                    db.collection('tickets').limit(1).get()
+                        .then(function() {
+                            isFirebaseConnected = true;
+                            statusEl.className = 'connection-status online';
+                            statusEl.innerHTML = 'Connected to Server';
+                            console.log('Firebase connected');
+                            resolve();
+                        })
+                        .catch(function(error) {
+                            console.warn('Firebase connection failed:', error);
+                            setOfflineMode(statusEl);
+                            resolve();
+                        });
+                } else {
+                    setOfflineMode(statusEl);
+                    resolve();
+                }
+            });
+        }
+        
+        function setOfflineMode(statusEl) {
+            isFirebaseConnected = false;
+            statusEl.className = 'connection-status offline';
+            statusEl.innerHTML = 'Offline Mode';
+            console.log('Running in offline mode');
+        }
         
         function decryptTicketCode(encrypted) {
             try {
-                // Add padding if needed
-                let padded = encrypted;
+                var padded = encrypted;
                 while (padded.length % 4 !== 0) {
                     padded += '=';
                 }
-                const decoded = atob(padded);
-                const parts = decoded.split('|');
-                return parts[0]; // Return ticket ID
+                var decoded = atob(padded);
+                var parts = decoded.split('|');
+                return parts[0];
             } catch (e) {
-                console.error('Decryption error:', e);
+                console. error('Decryption error:', e);
                 return null;
             }
         }
         
-        async function verifyTicket(encryptedCode) {
-            const ticketId = decryptTicketCode(encryptedCode);
-            
+        function verifyTicket(encryptedCode) {
+            var ticketId = decryptTicketCode(encryptedCode);
             if (!ticketId) {
                 showError('Invalid Ticket', 'This ticket code is not valid or has been tampered with.');
+                playErrorSound();
                 return;
             }
-            
             currentTicket = ticketId;
+            console.log('Verifying ticket:', ticketId);
             
-            // Try to find ticket in local storage first
-            const localTickets = JSON.parse(localStorage.getItem('ekintabuli_tickets') || '[]');
-            ticketData = localTickets.find(t => t.ticketId === ticketId);
-            
-            if (ticketData) {
-                displayTicketStatus(ticketData);
-            } else if (typeof db !== 'undefined' && db) {
-                // Try Firebase
-                try {
-                    const doc = await db.collection('tickets').doc(ticketId).get();
-                    if (doc.exists) {
-                        ticketData = { id: doc.id, ... doc.data() };
-                        displayTicketStatus(ticketData);
-                    } else {
-                        showError('Ticket Not Found', 'This ticket does not exist in our system.');
-                    }
-                } catch (e) {
-                    showError('Verification Failed', 'Could not verify ticket. Please try again.');
+            if (isFirebaseConnected && db) {
+                db.collection('tickets'). doc(ticketId).get()
+                    . then(function(doc) {
+                        if (doc.exists) {
+                            ticketData = doc. data();
+                            ticketData.ticketId = doc.id;
+                            console.log('Ticket found in Firebase:', ticketData);
+                            displayTicketStatus(ticketData);
+                        } else {
+                            checkLocalStorage(ticketId);
+                        }
+                    })
+                    .catch(function(error) {
+                        console.error('Firebase read error:', error);
+                        checkLocalStorage(ticketId);
+                    });
+            } else {
+                checkLocalStorage(ticketId);
+            }
+        }
+        
+        function checkLocalStorage(ticketId) {
+            var localTickets = JSON.parse(localStorage.getItem('ekintabuli_tickets') || '[]');
+            ticketData = null;
+            for (var i = 0; i < localTickets.length; i++) {
+                if (localTickets[i].ticketId === ticketId) {
+                    ticketData = localTickets[i];
+                    break;
                 }
+            }
+            if (ticketData) {
+                console.log('Ticket found in local storage:', ticketData);
+                displayTicketStatus(ticketData);
             } else {
                 showError('Ticket Not Found', 'This ticket does not exist in our system.');
+                playErrorSound();
             }
         }
         
         function displayTicketStatus(ticket) {
-            const content = document.getElementById('content');
-            
-            if (ticket. status === 'USED') {
-                content.innerHTML = `
-                    <div class="status-icon">⚠️</div>
-                    <p class="status-text status-used">ALREADY USED</p>
-                    
-                    <div class="ticket-info">
-                        <div class="info-row">
-                            <span class="info-label">Ticket ID</span>
-                            <span class="info-value">${ticket.ticketId}</span>
-                        </div>
-                        <div class="info-row">
-                            <span class="info-label">Used At</span>
-                            <span class="info-value">${formatDate(ticket.usedAt)}</span>
-                        </div>
-                    </div>
-                    
-                    <div class="message message-warning">
-                        ⚠️ This ticket has already been scanned and used for entry.  It cannot be used again.
-                    </div>
-                    
-                    <div class="footer">
-                        🔒 EKINTABULI Kya Christmas 2025
-                    </div>
-                `;
+            var content = document.getElementById('content');
+            if (ticket.status === 'USED' || ticket.used === true || ticket.scanned === true) {
+                playWarningSound();
+                content.innerHTML = '<div class="status-icon">⚠️</div>' +
+                    '<p class="status-text status-used">ALREADY USED</p>' +
+                    '<div class="ticket-info">' +
+                    '<div class="info-row"><span class="info-label">Ticket ID</span><span class="info-value">' + ticket.ticketId + '</span></div>' +
+                    '<div class="info-row"><span class="info-label">Used At</span><span class="info-value">' + formatDate(ticket.usedAt) + '</span></div>' +
+                    '</div>' +
+                    '<div class="message message-warning">This ticket has already been used for entry. </div>' +
+                    '<div class="footer">EKINTABULI Kya Christmas 2025</div>';
             } else {
-                // Valid ticket - show verification page
-                content. innerHTML = `
-                    <div class="status-icon">✅</div>
-                    <p class="status-text status-valid">VALID TICKET</p>
-                    
-                    <div class="ticket-info">
-                        <div class="info-row">
-                            <span class="info-label">Ticket ID</span>
-                            <span class="info-value">${ticket. ticketId}</span>
-                        </div>
-                        <div class="info-row">
-                            <span class="info-label">Event</span>
-                            <span class="info-value">EKINTABULI Kya Christmas</span>
-                        </div>
-                        <div class="info-row">
-                            <span class="info-label">Date</span>
-                            <span class="info-value">25th December 2025</span>
-                        </div>
-                        <div class="info-row">
-                            <span class="info-label">Venue</span>
-                            <span class="info-value">Club Missouka</span>
-                        </div>
-                        <div class="info-row">
-                            <span class="info-label">Status</span>
-                            <span class="info-value" style="color: #28a745;">✓ Ready for Entry</span>
-                        </div>
-                    </div>
-                    
-                    <div class="message message-success">
-                        ✅ This ticket is authentic and valid for entry. 
-                    </div>
-                    
-                    <div class="gate-section">
-                        <p class="gate-title">🚪 GATE STAFF ONLY - Enter PIN to validate entry</p>
-                        <div class="pin-input">
-                            <input type="password" maxlength="1" id="pin1" oninput="moveToNext(this, 'pin2')">
-                            <input type="password" maxlength="1" id="pin2" oninput="moveToNext(this, 'pin3')">
-                            <input type="password" maxlength="1" id="pin3" oninput="moveToNext(this, 'pin4')">
-                            <input type="password" maxlength="1" id="pin4" oninput="checkPin()">
-                        </div>
-                        <button class="btn btn-primary" id="validateBtn" onclick="validateEntry()" disabled>
-                            🚪 Validate Entry
-                        </button>
-                    </div>
-                    
-                    <div class="footer">
-                        🔒 Customers: This page confirms your ticket is valid. <br>
-                        Only gate staff can mark entry with the PIN.
-                    </div>
-                `;
+                playSuccessSound();
+                content.innerHTML = '<div class="status-icon">✅</div>' +
+                    '<p class="status-text status-valid">VALID TICKET</p>' +
+                    '<div class="ticket-info">' +
+                    '<div class="info-row"><span class="info-label">Ticket ID</span><span class="info-value">' + ticket.ticketId + '</span></div>' +
+                    '<div class="info-row"><span class="info-label">Event</span><span class="info-value">' + CONFIG.eventName + '</span></div>' +
+                    '<div class="info-row"><span class="info-label">Date</span><span class="info-value">' + CONFIG.eventDate + '</span></div>' +
+                    '<div class="info-row"><span class="info-label">Venue</span><span class="info-value">' + CONFIG.eventVenue + '</span></div>' +
+                    '<div class="info-row"><span class="info-label">Status</span><span class="info-value" style="color:#28a745;">Ready for Entry</span></div>' +
+                    '</div>' +
+                    '<div class="message message-success">This ticket is AUTHENTIC and valid for entry.</div>' +
+                    '<div class="gate-section">' +
+                    '<p class="gate-title">GATE STAFF ONLY - Enter PIN to validate entry</p>' +
+                    '<div class="pin-input">' +
+                    '<input type="tel" maxlength="1" id="pin1" oninput="moveNext(this,2)">' +
+                    '<input type="tel" maxlength="1" id="pin2" oninput="moveNext(this,3)">' +
+                    '<input type="tel" maxlength="1" id="pin3" oninput="moveNext(this,4)">' +
+                    '<input type="tel" maxlength="1" id="pin4" oninput="checkPinComplete()">' +
+                    '</div>' +
+                    '<button class="btn btn-primary" id="validateBtn" onclick="validateEntry()" disabled>Validate Entry</button>' +
+                    '</div>' +
+                    '<div class="footer">Only gate staff can mark entry with the PIN. </div>';
+                setTimeout(function() { document.getElementById('pin1').focus(); }, 100);
             }
         }
         
-        function moveToNext(current, nextId) {
-            if (current.value. length === 1) {
-                const next = document.getElementById(nextId);
-                if (next) next.focus();
+        function moveNext(current, next) {
+            current.value = current.value.replace(/[^0-9]/g, '');
+            if (current.value. length === 1 && next <= 4) {
+                document.getElementById('pin' + next). focus();
             }
+            checkPinComplete();
         }
         
-        function checkPin() {
-            const pin = document.getElementById('pin1').value +
-                       document.getElementById('pin2').value +
-                       document.getElementById('pin3').value +
-                       document.getElementById('pin4').value;
-            
-            document.getElementById('validateBtn').disabled = pin. length !== 4;
+        function checkPinComplete() {
+            var pin = getPin();
+            document.getElementById('validateBtn').disabled = (pin.length !== 4);
         }
         
-        async function validateEntry() {
-            const pin = document.getElementById('pin1').value +
-                       document.getElementById('pin2').value +
-                       document.getElementById('pin3').value +
-                       document. getElementById('pin4'). value;
-            
+        function getPin() {
+            var p1 = document. getElementById('pin1');
+            var p2 = document.getElementById('pin2');
+            var p3 = document.getElementById('pin3');
+            var p4 = document.getElementById('pin4');
+            if (! p1 || !p2 || !p3 || !p4) return '';
+            return p1.value + p2.value + p3.value + p4.value;
+        }
+        
+        function clearPin() {
+            document.getElementById('pin1').value = '';
+            document.getElementById('pin2').value = '';
+            document. getElementById('pin3'). value = '';
+            document.getElementById('pin4').value = '';
+            document.getElementById('pin1').focus();
+            document.getElementById('validateBtn').disabled = true;
+        }
+        
+        function validateEntry() {
+            var pin = getPin();
             if (pin !== CONFIG.gatePin) {
-                alert('❌ Invalid PIN!  Please try again.');
-                // Clear PIN inputs
-                document.getElementById('pin1').value = '';
-                document. getElementById('pin2'). value = '';
-                document.getElementById('pin3').value = '';
-                document.getElementById('pin4').value = '';
-                document.getElementById('pin1').focus();
-                document.getElementById('validateBtn').disabled = true;
+                playErrorSound();
+                alert('Invalid PIN!  Please try again.');
+                clearPin();
                 return;
             }
-            
-            // Mark ticket as used
-            const btn = document.getElementById('validateBtn');
+            var btn = document.getElementById('validateBtn');
             btn.disabled = true;
-            btn.innerHTML = '⏳ Processing...';
+            btn.innerHTML = 'Processing...';
+            var now = new Date();
+            var updateData = {
+                status: 'USED',
+                used: true,
+                scanned: true,
+                usedAt: now.toISOString(),
+                scannedAt: now.toISOString(),
+                scannedBy: 'Gate Staff'
+            };
             
-            try {
-                // Update local storage
-                const localTickets = JSON.parse(localStorage. getItem('ekintabuli_tickets') || '[]');
-                const ticketIndex = localTickets.findIndex(t => t.ticketId === currentTicket);
-                
-                if (ticketIndex !== -1) {
-                    localTickets[ticketIndex].status = 'USED';
-                    localTickets[ticketIndex].usedAt = new Date().toISOString();
-                    localStorage.setItem('ekintabuli_tickets', JSON. stringify(localTickets));
-                }
-                
-                // Update Firebase if available
-                if (typeof db !== 'undefined' && db) {
-                    await db.collection('tickets').doc(currentTicket).update({
-                        status: 'USED',
-                        usedAt: firebase.firestore. FieldValue.serverTimestamp()
-                    });
-                    
-                    // Log scan
-                    await db.collection('scanLogs').add({
+            if (isFirebaseConnected && db) {
+                db.collection('tickets').doc(currentTicket).update({
+                    status: 'USED',
+                    used: true,
+                    scanned: true,
+                    usedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                    scannedAt: firebase. firestore.FieldValue.serverTimestamp(),
+                    scannedBy: 'Gate Staff'
+                }).then(function() {
+                    console.log('Ticket updated in Firebase');
+                    return db.collection('scanLogs').add({
                         ticketId: currentTicket,
-                        result: 'VALID',
-                        timestamp: firebase.firestore. FieldValue.serverTimestamp()
+                        result: 'SUCCESS',
+                        timestamp: firebase.firestore. FieldValue.serverTimestamp(),
+                        device: navigator.userAgent. substring(0, 100)
                     });
-                }
-                
-                // Show success
-                const content = document.getElementById('content');
-                content.innerHTML = `
-                    <div class="status-icon">🎉</div>
-                    <p class="status-text status-valid">ENTRY GRANTED!</p>
-                    
-                    <div class="ticket-info">
-                        <div class="info-row">
-                            <span class="info-label">Ticket ID</span>
-                            <span class="info-value">${currentTicket}</span>
-                        </div>
-                        <div class="info-row">
-                            <span class="info-label">Entry Time</span>
-                            <span class="info-value">${new Date().toLocaleTimeString()}</span>
-                        </div>
-                    </div>
-                    
-                    <div class="message message-success">
-                        🎉 Welcome to EKINTABULI Kya Christmas 2025!  Enjoy the party!
-                    </div>
-                    
-                    <div class="footer">
-                        ✅ This ticket has been validated and cannot be used again. 
-                    </div>
-                `;
-                
-            } catch (error) {
-                console. error('Validation error:', error);
-                alert('Error validating ticket. Please try again.');
-                btn.disabled = false;
-                btn.innerHTML = '🚪 Validate Entry';
+                }).then(function() {
+                    console.log('Scan logged to Firebase');
+                    updateLocal(currentTicket, updateData);
+                    showSuccess();
+                    playSuccessSound();
+                }). catch(function(error) {
+                    console.error('Firebase update error:', error);
+                    updateLocal(currentTicket, updateData);
+                    showSuccess();
+                    playSuccessSound();
+                });
+            } else {
+                updateLocal(currentTicket, updateData);
+                showSuccess();
+                playSuccessSound();
             }
+        }
+        
+        function updateLocal(ticketId, updateData) {
+            try {
+                var localTickets = JSON. parse(localStorage.getItem('ekintabuli_tickets') || '[]');
+                for (var i = 0; i < localTickets.length; i++) {
+                    if (localTickets[i].ticketId === ticketId) {
+                        localTickets[i]. status = updateData. status;
+                        localTickets[i].used = updateData.used;
+                        localTickets[i].scanned = updateData.scanned;
+                        localTickets[i]. usedAt = updateData.usedAt;
+                        localTickets[i]. scannedAt = updateData.scannedAt;
+                        localTickets[i].scannedBy = updateData. scannedBy;
+                        break;
+                    }
+                }
+                localStorage.setItem('ekintabuli_tickets', JSON.stringify(localTickets));
+                console.log('Ticket updated in local storage');
+            } catch (e) {
+                console.error('Local storage error:', e);
+            }
+        }
+        
+        function showSuccess() {
+            var content = document.getElementById('content');
+            content.innerHTML = '<div class="status-icon">🎉</div>' +
+                '<p class="status-text status-valid">ENTRY GRANTED!</p>' +
+                '<div class="ticket-info">' +
+                '<div class="info-row"><span class="info-label">Ticket ID</span><span class="info-value">' + currentTicket + '</span></div>' +
+                '<div class="info-row"><span class="info-label">Entry Time</span><span class="info-value">' + new Date(). toLocaleTimeString() + '</span></div>' +
+                '</div>' +
+                '<div class="message message-success">Welcome to EKINTABULI Kya Christmas 2025!</div>' +
+                '<button class="btn btn-danger" onclick="location.reload()">Scan Next Ticket</button>' +
+                '<div class="footer">This ticket has been validated. </div>';
         }
         
         function showError(title, message) {
-            const content = document.getElementById('content');
-            content.innerHTML = `
-                <div class="status-icon">❌</div>
-                <p class="status-text status-invalid">${title}</p>
-                <div class="message message-error">${message}</div>
-                <div class="footer">
-                    🔒 EKINTABULI Kya Christmas 2025<br>
-                    If you believe this is an error, please contact event organizers.
-                </div>
-            `;
+            var content = document.getElementById('content');
+            content.innerHTML = '<div class="status-icon">❌</div>' +
+                '<p class="status-text status-invalid">' + title + '</p>' +
+                '<div class="message message-error">' + message + '</div>' +
+                '<button class="btn btn-danger" onclick="location.reload()" style="margin-top:20px;">Try Again</button>' +
+                '<div class="footer">Contact organizers if this is an error.</div>';
         }
         
-        function formatDate(dateStr) {
-            if (!dateStr) return 'Unknown';
-            const date = new Date(dateStr);
+        function formatDate(dateValue) {
+            if (!dateValue) return 'Unknown';
+            var date;
+            if (dateValue. toDate) {
+                date = dateValue.toDate();
+            } else {
+                date = new Date(dateValue);
+            }
             return date.toLocaleString();
         }
+        
+        function playSuccessSound() {
+            try {
+                var ctx = new (window.AudioContext || window.webkitAudioContext)();
+                var osc = ctx.createOscillator();
+                var gain = ctx.createGain();
+                osc.connect(gain);
+                gain.connect(ctx. destination);
+                osc.frequency.value = 523;
+                gain.gain.setValueAtTime(0.3, ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.5);
+                osc.start(ctx. currentTime);
+                osc.stop(ctx.currentTime + 0.5);
+            } catch (e) {}
+        }
+        
+        function playErrorSound() {
+            try {
+                var ctx = new (window.AudioContext || window.webkitAudioContext)();
+                var osc = ctx.createOscillator();
+                var gain = ctx. createGain();
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+                osc.frequency. value = 200;
+                osc.type = 'sawtooth';
+                gain.gain.setValueAtTime(0.3, ctx. currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.4);
+                osc.start(ctx. currentTime);
+                osc.stop(ctx.currentTime + 0.4);
+            } catch (e) {}
+        }
+        
+        function playWarningSound() {
+            try {
+                var ctx = new (window. AudioContext || window. webkitAudioContext)();
+                var osc = ctx.createOscillator();
+                var gain = ctx.createGain();
+                osc.connect(gain);
+                gain.connect(ctx. destination);
+                osc.frequency.value = 440;
+                gain.gain.setValueAtTime(0.3, ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.2);
+                osc.start(ctx. currentTime);
+                osc.stop(ctx.currentTime + 0.2);
+            } catch (e) {}
+        }
+        
+        console.log('Verification system loaded');
     </script>
 </body>
 </html>

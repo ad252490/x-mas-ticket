@@ -5,11 +5,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Admin Dashboard - EKINTABULI</title>
     <link rel="stylesheet" href="style.css">
-    <link href="https://fonts. googleapis.com/css2?family=Playfair+Display:wght@400;700;900&family=Montserrat:wght@400;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700;900&family=Montserrat:wght@400;600;700&display=swap" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10. 1/jszip.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
-    <script src="https://cdnjs. cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 </head>
 <body>
     <div class="header">
@@ -103,16 +103,12 @@
                     <p class="progress-text" id="progressText">Generating tickets...</p>
                 </div>
 
-                <div class="button-group">
-                    <button class="btn btn-primary btn-large" id="generateBtn">
-                        🎫 Generate Tickets
-                    </button>
-                    <button class="btn btn-secondary" id="downloadZipBtn" disabled>
-                        📥 Download ZIP (PNG)
-                    </button>
-                    <button class="btn btn-secondary" id="previewBtn" disabled>
-                        👁️ Preview Ticket
-                    </button>
+                  <div class="button-group">
+                    <button class="btn btn-primary btn-large" id="generateBtn">🎫 Generate Tickets</button>
+                    <button class="btn btn-secondary" id="downloadZipBtn" disabled>📥 Download ZIP (PNG)</button>
+                    <button class="btn btn-secondary" id="downloadPdfBtn" disabled>📄 Download PDF</button>
+                    <button class="btn btn-secondary" id="previewBtn" disabled>👁️ Preview Ticket</button>
+                </div>
                 </div>
             </div>
         </div>
@@ -264,10 +260,17 @@
     <!-- Notification Container -->
     <div id="notificationContainer"></div>
 
-    <!-- Firebase SDK -->
-    <script src="https://www.gstatic. com/firebasejs/9.22.0/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat. js"></script>
+   <!-- Firebase SDK -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
     <script src="../shared/firebase-config.js"></script>
-    <script src="admin. js"></script>
+    <script src="admin.js"></script>
+</body>
+</html>
 </body>
 </html>

@@ -1,6 +1,6 @@
 /* ================================================
-   EKINTABULI Admin Dashboard - JavaScript
-   Complete Working Version - No Firebase Required
+   EKINTABULI Admin Dashboard - Professional Ticket System
+   High Security + Premium Design
    ================================================ */
 
 // ================================================
@@ -13,7 +13,12 @@ const CONFIG = {
     eventVenue: 'Club Missouka',
     ticketPrice: 10000,
     currency: 'UGX',
-    secretKey: 'EKINTABULI-2025-XMAS-SECRET'
+    secretKey: 'EKINTABULI-2025-XMAS-SECRET',
+    // Ticket size: 5.5cm x 2cm at 300 DPI = 650px x 236px
+    // We'll use 2x for high quality: 1300px x 472px
+    ticketWidth: 650,
+    ticketHeight: 236,
+    printScale: 2
 };
 
 // ================================================
@@ -29,7 +34,9 @@ let isFirebaseConnected = false;
 // UTILITY FUNCTIONS
 // ================================================
 function sleep(ms) {
-    return new Promise(resolve => setTimeout(resolve, ms));
+    return new Promise(function(resolve) {
+        setTimeout(resolve, ms);
+    });
 }
 
 function formatCurrency(amount) {
@@ -38,8 +45,7 @@ function formatCurrency(amount) {
 
 function formatTimestamp(timestamp) {
     if (!timestamp) return 'N/A';
-    
-    let date;
+    var date;
     if (timestamp.toDate) {
         date = timestamp.toDate();
     } else if (typeof timestamp === 'string') {
@@ -47,7 +53,6 @@ function formatTimestamp(timestamp) {
     } else {
         date = new Date(timestamp);
     }
-    
     return date.toLocaleDateString('en-US', {
         month: 'short',
         day: 'numeric',
@@ -57,70 +62,106 @@ function formatTimestamp(timestamp) {
 }
 
 function getVerifyUrl() {
-    const currentUrl = window.location. href;
-    const baseUrl = currentUrl. replace('/admin/index.html', '/verify/index.html')
-                              .replace('/admin/', '/verify/');
+    var currentUrl = window.location. href;
+    var baseUrl = currentUrl. replace('/admin/index.html', '/verify/index.html'). replace('/admin/', '/verify/');
     return baseUrl. split('?')[0];
 }
 
-function showNotification(message, type = 'success') {
-    const container = document.getElementById('notificationContainer');
+function showNotification(message, type) {
+    type = type || 'success';
+    var container = document.getElementById('notificationContainer');
     if (! container) return;
-    
-    const notification = document.createElement('div');
-    notification.className = `notification ${type}`;
-    notification.innerHTML = `
-        <span>${type === 'success' ? '✅' : type === 'error' ? '❌' : '⚠️'}</span>
-        <span>${message}</span>
-    `;
-    
+    var icon = type === 'success' ? '✅' : type === 'error' ? '❌' : '⚠️';
+    var notification = document.createElement('div');
+    notification.className = 'notification ' + type;
+    notification. innerHTML = '<span>' + icon + '</span><span>' + message + '</span>';
     container.appendChild(notification);
-    
-    setTimeout(() => {
+    setTimeout(function() {
         notification.style.opacity = '0';
-        setTimeout(() => notification.remove(), 300);
+        setTimeout(function() { notification.remove(); }, 300);
     }, 4000);
+}
+
+// ================================================
+// SECURE TICKET ID GENERATION
+// ================================================
+function generateSecureTicketId(number) {
+    var prefix = 'EKT';
+    var year = '25';
+    var paddedNum = String(number).padStart(4, '0');
+    var randomSuffix = generateRandomString(4);
+    var checksum = generateChecksum(prefix + year + paddedNum + randomSuffix);
+    return prefix + '-' + year + '-' + paddedNum + '-' + randomSuffix + checksum;
+}
+
+function generateRandomString(length) {
+    var chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    var result = '';
+    var array = new Uint32Array(length);
+    window.crypto.getRandomValues(array);
+    for (var i = 0; i < length; i++) {
+        result += chars.charAt(array[i] % chars.length);
+    }
+    return result;
+}
+
+function generateChecksum(str) {
+    var sum = 0;
+    for (var i = 0; i < str.length; i++) {
+        sum += str.charCodeAt(i) * (i + 1);
+    }
+    return (sum % 36). toString(36). toUpperCase();
+}
+
+function encryptTicketCode(ticketId) {
+    var timestamp = Date.now(). toString(36);
+    var random = generateRandomString(8);
+    var combined = ticketId + '|' + CONFIG.secretKey + '|' + timestamp + '|' + random;
+    var encrypted = btoa(combined);
+    // Add integrity hash
+    var hash = simpleHash(encrypted);
+    return encrypted. replace(/[=+/]/g, '') + hash;
+}
+
+function simpleHash(str) {
+    var hash = 0;
+    for (var i = 0; i < str.length; i++) {
+        var char = str.charCodeAt(i);
+        hash = ((hash << 5) - hash) + char;
+        hash = hash & hash;
+    }
+    return Math.abs(hash). toString(36). substring(0, 4). toUpperCase();
 }
 
 // ================================================
 // INITIALIZATION
 // ================================================
 document.addEventListener('DOMContentLoaded', function() {
-    console.log('🚀 Initializing EKINTABULI Admin Dashboard...');
-    
-    // Try to connect to Firebase
+    console.log('Initializing EKINTABULI Admin Dashboard.. .');
     checkFirebaseConnection();
-    
-    // Setup all event listeners
     setupEventListeners();
-    
-    // Load existing tickets
     loadTickets();
-    
-    // Update dashboard
     updateDashboard();
     renderTicketTable();
 });
 
 function checkFirebaseConnection() {
-    const statusEl = document.getElementById('connectionStatus');
-    const textEl = statusEl.querySelector('.status-text');
-    const dotEl = statusEl. querySelector('.status-dot');
+    var statusEl = document.getElementById('connectionStatus');
+    var textEl = statusEl.querySelector('.status-text');
+    var dotEl = statusEl.querySelector('.status-dot');
     
-    // Check if Firebase is available and configured
     if (typeof firebase !== 'undefined' && typeof db !== 'undefined' && db !== null) {
-        // Try a simple read to verify connection
-        db.collection('tickets'). limit(1).get()
-            .then(() => {
+        db.collection('tickets').limit(1).get()
+            .then(function() {
                 isFirebaseConnected = true;
                 statusEl.className = 'connection-status connected';
-                textEl.textContent = '🟢 Connected to Firebase - Real-time sync active';
-                dotEl. style.background = '#28a745';
-                console.log('✅ Firebase connected');
+                textEl.textContent = 'Connected to Firebase - Real-time sync active';
+                dotEl.style.background = '#28a745';
+                console.log('Firebase connected');
                 setupFirebaseListeners();
             })
-            . catch((error) => {
-                console.warn('⚠️ Firebase read failed:', error);
+            . catch(function(error) {
+                console.warn('Firebase read failed:', error);
                 setLocalMode(statusEl, textEl, dotEl);
             });
     } else {
@@ -131,63 +172,63 @@ function checkFirebaseConnection() {
 function setLocalMode(statusEl, textEl, dotEl) {
     isFirebaseConnected = false;
     statusEl.className = 'connection-status local';
-    textEl.textContent = '🟡 Offline Mode - Data saved locally in your browser';
+    textEl.textContent = 'Offline Mode - Data saved locally';
     dotEl.style.background = '#fd7e14';
-    console.log('📦 Running in local storage mode');
+    console.log('Running in local storage mode');
 }
 
 function setupFirebaseListeners() {
     if (!isFirebaseConnected || !db) return;
     
-    // Real-time listener for tickets
-    db.collection('tickets'). orderBy('createdAt', 'desc'). onSnapshot(snapshot => {
+    db.collection('tickets'). orderBy('createdAt', 'desc').onSnapshot(function(snapshot) {
         allTickets = [];
-        snapshot.forEach(doc => {
-            allTickets.push({ id: doc.id, ...doc.data() });
+        snapshot.forEach(function(doc) {
+            var data = doc.data();
+            data.id = doc. id;
+            allTickets.push(data);
         });
         updateDashboard();
         renderTicketTable();
     });
     
-    // Real-time listener for scan logs
-    db.collection('scanLogs'). orderBy('timestamp', 'desc'). limit(50).onSnapshot(snapshot => {
+    db.collection('scanLogs').orderBy('timestamp', 'desc').limit(50).onSnapshot(function(snapshot) {
         renderScanLogs(snapshot);
     });
 }
 
 function setupEventListeners() {
-    // Logout button
-    const logoutBtn = document.getElementById('logoutBtn');
+    var logoutBtn = document.getElementById('logoutBtn');
     if (logoutBtn) {
-        logoutBtn. addEventListener('click', function() {
+        logoutBtn.addEventListener('click', function() {
             if (confirm('Are you sure you want to logout?')) {
                 sessionStorage.removeItem('ekintabuli_auth');
                 localStorage.removeItem('ekintabuli_auth');
-                window.location.href = '../index.html';
+                window. location.href = '../index.html';
             }
         });
     }
     
-    // Generate button
-    const generateBtn = document.getElementById('generateBtn');
+    var generateBtn = document.getElementById('generateBtn');
     if (generateBtn) {
         generateBtn.addEventListener('click', generateAllTickets);
     }
     
-    // Download ZIP button
-    const downloadZipBtn = document.getElementById('downloadZipBtn');
+    var downloadZipBtn = document. getElementById('downloadZipBtn');
     if (downloadZipBtn) {
         downloadZipBtn.addEventListener('click', downloadAsZip);
     }
     
-    // Preview button
-    const previewBtn = document.getElementById('previewBtn');
-    if (previewBtn) {
-        previewBtn. addEventListener('click', showPreview);
+    var downloadPdfBtn = document.getElementById('downloadPdfBtn');
+    if (downloadPdfBtn) {
+        downloadPdfBtn.addEventListener('click', downloadAsPdf);
     }
     
-    // Refresh button
-    const refreshBtn = document.getElementById('refreshBtn');
+    var previewBtn = document. getElementById('previewBtn');
+    if (previewBtn) {
+        previewBtn.addEventListener('click', showPreview);
+    }
+    
+    var refreshBtn = document.getElementById('refreshBtn');
     if (refreshBtn) {
         refreshBtn.addEventListener('click', function() {
             loadTickets();
@@ -197,14 +238,12 @@ function setupEventListeners() {
         });
     }
     
-    // Export CSV button
-    const exportBtn = document.getElementById('exportBtn');
+    var exportBtn = document.getElementById('exportBtn');
     if (exportBtn) {
         exportBtn.addEventListener('click', exportReport);
     }
     
-    // Search input
-    const searchInput = document.getElementById('searchTicket');
+    var searchInput = document.getElementById('searchTicket');
     if (searchInput) {
         searchInput.addEventListener('keyup', function() {
             currentPage = 1;
@@ -212,8 +251,7 @@ function setupEventListeners() {
         });
     }
     
-    // Filter select
-    const filterSelect = document.getElementById('filterStatus');
+    var filterSelect = document.getElementById('filterStatus');
     if (filterSelect) {
         filterSelect.addEventListener('change', function() {
             currentPage = 1;
@@ -221,14 +259,12 @@ function setupEventListeners() {
         });
     }
     
-    // Modal close button
-    const closeModalBtn = document.getElementById('closeModalBtn');
+    var closeModalBtn = document.getElementById('closeModalBtn');
     if (closeModalBtn) {
         closeModalBtn. addEventListener('click', closeModal);
     }
     
-    // Close modal on background click
-    const modal = document.getElementById('ticketPreviewModal');
+    var modal = document.getElementById('ticketPreviewModal');
     if (modal) {
         modal.addEventListener('click', function(e) {
             if (e.target === this) closeModal();
@@ -244,11 +280,11 @@ function saveTickets() {
 }
 
 function loadTickets() {
-    const saved = localStorage. getItem('ekintabuli_tickets');
+    var saved = localStorage. getItem('ekintabuli_tickets');
     if (saved) {
         try {
             allTickets = JSON.parse(saved);
-            console.log(`📦 Loaded ${allTickets.length} tickets from local storage`);
+            console.log('Loaded ' + allTickets. length + ' tickets from local storage');
         } catch (e) {
             console.error('Error loading tickets:', e);
             allTickets = [];
@@ -260,150 +296,91 @@ function loadTickets() {
 // DASHBOARD UPDATES
 // ================================================
 function updateDashboard() {
-    let stats = {
-        generated: 0,
-        downloaded: 0,
-        sold: 0,
-        used: 0,
-        revenue: 0
-    };
+    var stats = { generated: 0, downloaded: 0, sold: 0, used: 0, revenue: 0 };
     
-    allTickets.forEach(ticket => {
+    for (var i = 0; i < allTickets.length; i++) {
+        var ticket = allTickets[i];
         stats.generated++;
-        
-        switch(ticket.status) {
-            case 'DOWNLOADED':
-                stats. downloaded++;
-                break;
-            case 'SOLD':
-                stats.sold++;
-                stats.revenue += CONFIG.ticketPrice;
-                break;
-            case 'USED':
-                stats.used++;
-                stats.sold++;
-                stats.revenue += CONFIG.ticketPrice;
-                break;
-        }
-    });
+        if (ticket.status === 'DOWNLOADED') stats.downloaded++;
+        if (ticket.status === 'SOLD') { stats.sold++; stats.revenue += CONFIG.ticketPrice; }
+        if (ticket.status === 'USED') { stats.used++; stats.sold++; stats.revenue += CONFIG.ticketPrice; }
+    }
     
-    // Update stat boxes
     document.getElementById('statGenerated').textContent = stats.generated;
     document.getElementById('statDownloaded').textContent = stats.downloaded;
     document.getElementById('statSold').textContent = stats.sold;
     document.getElementById('statUsed'). textContent = stats. used;
     document.getElementById('statRevenue').textContent = formatCurrency(stats.revenue);
     
-    // Update revenue tracking
-    const ticketCount = parseInt(document.getElementById('ticketCount').value) || 400;
-    const ticketPrice = parseInt(document.getElementById('ticketPrice').value) || CONFIG.ticketPrice;
+    var ticketCount = parseInt(document.getElementById('ticketCount').value) || 400;
+    var ticketPrice = parseInt(document.getElementById('ticketPrice').value) || CONFIG.ticketPrice;
+    var totalPotential = ticketCount * ticketPrice;
+    var soldRevenue = stats.sold * ticketPrice;
+    var attendancePercent = stats.sold > 0 ?  Math.round((stats. used / stats.sold) * 100) : 0;
     
-    const totalPotential = ticketCount * ticketPrice;
-    const soldRevenue = stats.sold * ticketPrice;
-    const attendancePercent = stats.sold > 0 ? Math.round((stats. used / stats.sold) * 100) : 0;
-    
-    document.getElementById('totalPotential').textContent = 
-        `${ticketCount} × ${formatCurrency(ticketPrice)} = ${formatCurrency(totalPotential)} UGX`;
-    document.getElementById('soldRevenue').textContent = 
-        `${stats.sold} × ${formatCurrency(ticketPrice)} = ${formatCurrency(soldRevenue)} UGX`;
-    document.getElementById('attendanceRate').textContent = 
-        `${stats.used} / ${stats.sold} (${attendancePercent}%)`;
-    document.getElementById('expectedCollection').textContent = `${formatCurrency(soldRevenue)} UGX`;
+    document.getElementById('totalPotential').textContent = ticketCount + ' x ' + formatCurrency(ticketPrice) + ' = ' + formatCurrency(totalPotential) + ' UGX';
+    document.getElementById('soldRevenue').textContent = stats.sold + ' x ' + formatCurrency(ticketPrice) + ' = ' + formatCurrency(soldRevenue) + ' UGX';
+    document. getElementById('attendanceRate').textContent = stats.used + ' / ' + stats.sold + ' (' + attendancePercent + '%)';
+    document.getElementById('expectedCollection').textContent = formatCurrency(soldRevenue) + ' UGX';
 }
 
 // ================================================
 // TICKET TABLE
 // ================================================
 function renderTicketTable() {
-    const tbody = document.getElementById('ticketTableBody');
-    const searchTerm = (document.getElementById('searchTicket').value || '').toLowerCase();
-    const filterStatus = document.getElementById('filterStatus').value;
+    var tbody = document.getElementById('ticketTableBody');
+    var searchTerm = (document.getElementById('searchTicket').value || '').toLowerCase();
+    var filterStatus = document.getElementById('filterStatus').value;
     
-    // Filter tickets
-    let filteredTickets = allTickets. filter(ticket => {
-        const matchesSearch = ticket.ticketId.toLowerCase(). includes(searchTerm);
-        const matchesStatus = filterStatus === 'all' || ticket.status === filterStatus;
+    var filteredTickets = allTickets. filter(function(ticket) {
+        var matchesSearch = ticket. ticketId.toLowerCase(). indexOf(searchTerm) !== -1;
+        var matchesStatus = filterStatus === 'all' || ticket.status === filterStatus;
         return matchesSearch && matchesStatus;
     });
     
-    // Pagination
-    const totalPages = Math.ceil(filteredTickets.length / ticketsPerPage);
-    const startIdx = (currentPage - 1) * ticketsPerPage;
-    const pageTickets = filteredTickets.slice(startIdx, startIdx + ticketsPerPage);
+    var totalPages = Math.ceil(filteredTickets. length / ticketsPerPage);
+    var startIdx = (currentPage - 1) * ticketsPerPage;
+    var pageTickets = filteredTickets.slice(startIdx, startIdx + ticketsPerPage);
     
     if (pageTickets. length === 0) {
-        tbody.innerHTML = `
-            <tr>
-                <td colspan="4" class="empty-state">
-                    <div class="empty-icon">🎫</div>
-                    <p>No tickets found</p>
-                    <p class="empty-hint">Generate tickets or adjust your search</p>
-                </td>
-            </tr>
-        `;
+        tbody. innerHTML = '<tr><td colspan="4" class="empty-state"><div class="empty-icon">🎫</div><p>No tickets found</p></td></tr>';
         document.getElementById('pagination').innerHTML = '';
         return;
     }
     
-    let html = '';
-    pageTickets.forEach(ticket => {
-        const statusClass = `status-${ticket. status. toLowerCase()}`;
-        const createdAt = formatTimestamp(ticket.createdAt);
-        
-        html += `
-            <tr>
-                <td>
-                    <code style="background: rgba(212,175,55,0.1); padding: 5px 10px; border-radius: 5px; font-size: 12px;">
-                        ${ticket.ticketId}
-                    </code>
-                </td>
-                <td><span class="status-badge ${statusClass}">${ticket.status}</span></td>
-                <td>${createdAt}</td>
-                <td>
-                    <button class="btn btn-small btn-secondary" onclick="viewTicket('${ticket.ticketId}')">👁️</button>
-                    <button class="btn btn-small btn-primary" onclick="markTicketAsSold('${ticket.ticketId}')">💰</button>
-                </td>
-            </tr>
-        `;
-    });
-    
+    var html = '';
+    for (var i = 0; i < pageTickets.length; i++) {
+        var ticket = pageTickets[i];
+        var statusClass = 'status-' + ticket.status. toLowerCase();
+        html += '<tr>' +
+            '<td><code style="background:rgba(212,175,55,0. 1);padding:5px 10px;border-radius:5px;font-size:12px;">' + ticket.ticketId + '</code></td>' +
+            '<td><span class="status-badge ' + statusClass + '">' + ticket. status + '</span></td>' +
+            '<td>' + formatTimestamp(ticket. createdAt) + '</td>' +
+            '<td>' +
+                '<button class="btn btn-small btn-secondary" onclick="viewTicket(\'' + ticket.ticketId + '\')">👁️</button>' +
+                '<button class="btn btn-small btn-primary" onclick="markTicketAsSold(\'' + ticket.ticketId + '\')">💰</button>' +
+            '</td></tr>';
+    }
     tbody.innerHTML = html;
     renderPagination(totalPages);
 }
 
 function renderPagination(totalPages) {
-    const container = document.getElementById('pagination');
-    if (totalPages <= 1) {
-        container.innerHTML = '';
-        return;
+    var container = document.getElementById('pagination');
+    if (totalPages <= 1) { container.innerHTML = ''; return; }
+    var html = '';
+    if (currentPage > 1) html += '<button onclick="goToPage(' + (currentPage - 1) + ')">Prev</button>';
+    for (var i = 1; i <= totalPages; i++) {
+        if (i <= 3 || i > totalPages - 3 || Math.abs(i - currentPage) <= 1) {
+            html += '<button class="' + (i === currentPage ? 'active' : '') + '" onclick="goToPage(' + i + ')">' + i + '</button>';
+        } else if (i === 4 || i === totalPages - 3) {
+            html += '<span>...</span>';
+        }
     }
-    
-    let html = '';
-    
-    if (currentPage > 1) {
-        html += `<button onclick="goToPage(${currentPage - 1})">← Prev</button>`;
-    }
-    
-    const maxVisible = 7;
-    let startPage = Math.max(1, currentPage - 3);
-    let endPage = Math.min(totalPages, startPage + maxVisible - 1);
-    
-    if (endPage - startPage < maxVisible - 1) {
-        startPage = Math.max(1, endPage - maxVisible + 1);
-    }
-    
-    for (let i = startPage; i <= endPage; i++) {
-        html += `<button class="${i === currentPage ?  'active' : ''}" onclick="goToPage(${i})">${i}</button>`;
-    }
-    
-    if (currentPage < totalPages) {
-        html += `<button onclick="goToPage(${currentPage + 1})">Next →</button>`;
-    }
-    
+    if (currentPage < totalPages) html += '<button onclick="goToPage(' + (currentPage + 1) + ')">Next</button>';
     container.innerHTML = html;
 }
 
-// Make goToPage global
 window.goToPage = function(page) {
     currentPage = page;
     renderTicketTable();
@@ -413,41 +390,29 @@ window.goToPage = function(page) {
 // SCAN LOGS
 // ================================================
 function renderScanLogs(snapshot) {
-    const container = document.getElementById('scanLogsContainer');
-    let totalScans = 0, validScans = 0, invalidScans = 0, duplicateScans = 0;
-    let logsHtml = '';
+    var container = document.getElementById('scanLogsContainer');
+    var totalScans = 0, validScans = 0, invalidScans = 0, duplicateScans = 0;
+    var logsHtml = '';
     
     if (snapshot && snapshot.forEach) {
-        snapshot.forEach(doc => {
-            const log = doc.data();
+        snapshot.forEach(function(doc) {
+            var log = doc.data();
             totalScans++;
-            
-            let statusClass = 'invalid';
-            let icon = '❓';
-            
+            var statusClass = 'invalid';
+            var icon = '❓';
             if (log.result === 'VALID' || log.result === 'SUCCESS') {
-                validScans++;
-                statusClass = 'valid';
-                icon = '✅';
+                validScans++; statusClass = 'valid'; icon = '✅';
             } else if (log.result === 'ALREADY_USED' || log.result === 'DUPLICATE') {
-                duplicateScans++;
-                statusClass = 'duplicate';
-                icon = '⚠️';
+                duplicateScans++; statusClass = 'duplicate'; icon = '⚠️';
             } else {
-                invalidScans++;
-                statusClass = 'invalid';
-                icon = '❌';
+                invalidScans++; statusClass = 'invalid'; icon = '❌';
             }
-            
-            logsHtml += `
-                <div class="scan-log-item ${statusClass}">
-                    <div class="scan-log-icon">${icon}</div>
-                    <div class="scan-log-content">
-                        <div class="scan-log-ticket">${log.ticketId || 'Unknown Ticket'}</div>
-                        <div class="scan-log-time">${formatTimestamp(log.timestamp)} - ${log.result}</div>
-                    </div>
-                </div>
-            `;
+            logsHtml += '<div class="scan-log-item ' + statusClass + '">' +
+                '<div class="scan-log-icon">' + icon + '</div>' +
+                '<div class="scan-log-content">' +
+                    '<div class="scan-log-ticket">' + (log.ticketId || 'Unknown') + '</div>' +
+                    '<div class="scan-log-time">' + formatTimestamp(log.timestamp) + ' - ' + log.result + '</div>' +
+                '</div></div>';
         });
     }
     
@@ -455,7 +420,6 @@ function renderScanLogs(snapshot) {
     document.getElementById('validScans'). textContent = validScans;
     document.getElementById('invalidScans').textContent = invalidScans;
     document.getElementById('duplicateScans'). textContent = duplicateScans;
-    
     container.innerHTML = logsHtml || '<div class="empty-state"><p>No scans recorded yet</p></div>';
 }
 
@@ -463,94 +427,87 @@ function renderScanLogs(snapshot) {
 // TICKET GENERATION
 // ================================================
 async function generateAllTickets() {
-    const ticketCount = parseInt(document. getElementById('ticketCount').value) || 400;
-    const btn = document.getElementById('generateBtn');
-    const progressContainer = document.getElementById('progressContainer');
-    const progressFill = document.getElementById('progressFill');
-    const progressText = document.getElementById('progressText');
-    const badge = document.getElementById('ticketBadge');
+    var ticketCount = parseInt(document. getElementById('ticketCount').value) || 400;
+    var btn = document.getElementById('generateBtn');
+    var progressContainer = document.getElementById('progressContainer');
+    var progressFill = document.getElementById('progressFill');
+    var progressText = document.getElementById('progressText');
+    var badge = document.getElementById('ticketBadge');
     
-    // Confirm if tickets exist
     if (allTickets.length > 0) {
-        if (! confirm(`You already have ${allTickets.length} tickets.  Generate ${ticketCount} new tickets?  This will replace existing tickets.`)) {
+        if (! confirm('You have ' + allTickets.length + ' tickets.  Generate ' + ticketCount + ' new tickets?  This will replace existing. ')) {
             return;
         }
     }
     
     btn.disabled = true;
-    btn.innerHTML = '⏳ Generating...';
+    btn.innerHTML = 'Generating...';
     badge.textContent = 'Generating';
-    progressContainer.style.display = 'block';
+    progressContainer. style.display = 'block';
     
     allTickets = [];
     generatedTicketsData = [];
     
     try {
-        for (let i = 1; i <= ticketCount; i++) {
-            const ticketId = generateSecureTicketId(i);
-            const encryptedCode = encryptTicketCode(ticketId);
-            const verifyUrl = `${getVerifyUrl()}? t=${encodeURIComponent(encryptedCode)}`;
+        for (var i = 1; i <= ticketCount; i++) {
+            var ticketId = generateSecureTicketId(i);
+            var encryptedCode = encryptTicketCode(ticketId);
+            var verifyUrl = getVerifyUrl() + '?t=' + encodeURIComponent(encryptedCode);
             
-            const ticketData = {
+            var ticketData = {
                 ticketId: ticketId,
                 ticketNumber: i,
                 status: 'GENERATED',
-                createdAt: new Date(). toISOString(),
+                createdAt: new Date().toISOString(),
                 eventName: CONFIG.eventName,
                 eventDate: CONFIG.eventDate,
                 eventVenue: CONFIG.eventVenue,
                 price: CONFIG.ticketPrice,
                 encryptedCode: encryptedCode,
-                verifyUrl: verifyUrl
+                verifyUrl: verifyUrl,
+                securityHash: simpleHash(ticketId + CONFIG. secretKey)
             };
             
             allTickets.push(ticketData);
-            generatedTicketsData.push(ticketData);
+            generatedTicketsData. push(ticketData);
             
-            // Update progress
-            const percent = Math.round((i / ticketCount) * 100);
-            progressFill.style.width = `${percent}%`;
-            progressFill.textContent = `${percent}%`;
-            progressText.textContent = `Generating ticket ${i} of ${ticketCount}...`;
+            var percent = Math.round((i / ticketCount) * 100);
+            progressFill.style.width = percent + '%';
+            progressFill.textContent = percent + '%';
+            progressText.textContent = 'Generating ticket ' + i + ' of ' + ticketCount + '...';
             
-            // Allow UI to update
-            if (i % 100 === 0) {
-                await sleep(1);
-            }
+            if (i % 50 === 0) await sleep(1);
         }
         
-        progressText.textContent = 'Saving tickets... ';
-        
-        // Save to local storage
+        progressText.textContent = 'Saving tickets...';
         saveTickets();
         
-        // Try to save to Firebase if connected
         if (isFirebaseConnected && db) {
             try {
                 await saveTicketsToFirebase();
-                progressText.textContent = `✅ Generated ${ticketCount} tickets (synced to cloud)! `;
+                progressText.textContent = 'Generated ' + ticketCount + ' tickets (synced to cloud)! ';
             } catch (e) {
                 console.warn('Firebase save failed:', e);
-                progressText. textContent = `✅ Generated ${ticketCount} tickets (saved locally)!`;
+                progressText. textContent = 'Generated ' + ticketCount + ' tickets (saved locally)!';
             }
         } else {
-            progressText.textContent = `✅ Generated ${ticketCount} tickets (saved locally)!`;
+            progressText.textContent = 'Generated ' + ticketCount + ' tickets (saved locally)!';
         }
         
         badge.textContent = 'Complete';
-        
-        // Enable buttons
         document.getElementById('downloadZipBtn').disabled = false;
         document.getElementById('previewBtn').disabled = false;
         
-        showNotification(`Successfully generated ${ticketCount} tickets!`, 'success');
+        var pdfBtn = document.getElementById('downloadPdfBtn');
+        if (pdfBtn) pdfBtn.disabled = false;
         
+        showNotification('Successfully generated ' + ticketCount + ' tickets! ', 'success');
         updateDashboard();
         renderTicketTable();
         
     } catch (error) {
-        console. error('Generation error:', error);
-        progressText.textContent = '❌ Error generating tickets';
+        console.error('Generation error:', error);
+        progressText.textContent = 'Error generating tickets';
         badge.textContent = 'Error';
         showNotification('Failed to generate: ' + error.message, 'error');
     } finally {
@@ -560,56 +517,19 @@ async function generateAllTickets() {
 }
 
 async function saveTicketsToFirebase() {
-    if (!db) return;
-    
-    const batchSize = 400;
-    
-    for (let i = 0; i < allTickets.length; i += batchSize) {
-        const batch = db.batch();
-        const chunk = allTickets. slice(i, i + batchSize);
-        
-        chunk.forEach(ticket => {
-            const docRef = db.collection('tickets').doc(ticket.ticketId);
-            batch. set(docRef, {
-                ...ticket,
-                createdAt: firebase.firestore. FieldValue.serverTimestamp()
-            });
-        });
-        
+    if (! db) return;
+    var batchSize = 400;
+    for (var i = 0; i < allTickets.length; i += batchSize) {
+        var batch = db.batch();
+        var chunk = allTickets. slice(i, i + batchSize);
+        for (var j = 0; j < chunk.length; j++) {
+            var ticket = chunk[j];
+            var docRef = db.collection('tickets').doc(ticket.ticketId);
+            var ticketCopy = Object.assign({}, ticket);
+            ticketCopy.createdAt = firebase.firestore. FieldValue.serverTimestamp();
+            batch.set(docRef, ticketCopy);
+        }
         await batch.commit();
-    }
-}
-
-function generateSecureTicketId(number) {
-    const prefix = 'EKT';
-    const year = '25';
-    const paddedNum = String(number).padStart(4, '0');
-    const randomSuffix = generateRandomString(4);
-    return `${prefix}-${year}-${paddedNum}-${randomSuffix}`;
-}
-
-function generateRandomString(length) {
-    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-    let result = '';
-    for (let i = 0; i < length; i++) {
-        result += chars.charAt(Math.floor(Math. random() * chars. length));
-    }
-    return result;
-}
-
-function encryptTicketCode(ticketId) {
-    const timestamp = Date.now(). toString(36);
-    const combined = `${ticketId}|${CONFIG.secretKey}|${timestamp}`;
-    return btoa(combined). replace(/[=+/]/g, ''). substring(0, 32);
-}
-
-function decryptTicketCode(encrypted) {
-    try {
-        const decoded = atob(encrypted);
-        const parts = decoded.split('|');
-        return parts[0];
-    } catch (e) {
-        return null;
     }
 }
 
@@ -617,7 +537,13 @@ function decryptTicketCode(encrypted) {
 // TICKET ACTIONS
 // ================================================
 window.viewTicket = function(ticketId) {
-    const ticket = allTickets.find(t => t.ticketId === ticketId);
+    var ticket = null;
+    for (var i = 0; i < allTickets.length; i++) {
+        if (allTickets[i].ticketId === ticketId) {
+            ticket = allTickets[i];
+            break;
+        }
+    }
     if (ticket) {
         showTicketPreview(ticket);
     } else {
@@ -626,21 +552,22 @@ window.viewTicket = function(ticketId) {
 };
 
 window. markTicketAsSold = function(ticketId) {
-    const ticketIndex = allTickets.findIndex(t => t.ticketId === ticketId);
-    if (ticketIndex !== -1) {
-        allTickets[ticketIndex].status = 'SOLD';
-        allTickets[ticketIndex].soldAt = new Date().toISOString();
-        saveTickets();
-        updateDashboard();
-        renderTicketTable();
-        showNotification(`Ticket ${ticketId} marked as sold!`, 'success');
-        
-        // Update Firebase if connected
-        if (isFirebaseConnected && db) {
-            db.collection('tickets'). doc(ticketId).update({
-                status: 'SOLD',
-                soldAt: firebase.firestore. FieldValue.serverTimestamp()
-            }). catch(e => console.warn('Firebase update failed:', e));
+    for (var i = 0; i < allTickets.length; i++) {
+        if (allTickets[i].ticketId === ticketId) {
+            allTickets[i]. status = 'SOLD';
+            allTickets[i]. soldAt = new Date().toISOString();
+            saveTickets();
+            updateDashboard();
+            renderTicketTable();
+            showNotification('Ticket ' + ticketId + ' marked as sold! ', 'success');
+            
+            if (isFirebaseConnected && db) {
+                db.collection('tickets'). doc(ticketId).update({
+                    status: 'SOLD',
+                    soldAt: firebase.firestore. FieldValue.serverTimestamp()
+                }). catch(function(e) { console.warn('Firebase update failed:', e); });
+            }
+            break;
         }
     }
 };
@@ -657,241 +584,202 @@ function showPreview() {
 }
 
 function showTicketPreview(ticket) {
-    const modal = document.getElementById('ticketPreviewModal');
-    const frontContainer = document.getElementById('ticketFrontPreview');
-    const backContainer = document. getElementById('ticketBackPreview');
+    var modal = document.getElementById('ticketPreviewModal');
+    var frontContainer = document.getElementById('ticketFrontPreview');
+    var backContainer = document. getElementById('ticketBackPreview');
     
     frontContainer.innerHTML = createTicketFrontHTML(ticket);
     backContainer.innerHTML = createTicketBackHTML(ticket);
     
-    modal. classList.add('active');
+    modal.classList.add('active');
     
-    // Generate QR code
-    setTimeout(() => {
-        const qrContainer = document.getElementById(`qr-${ticket.ticketId}`);
-        if (qrContainer) {
+    setTimeout(function() {
+        var qrContainer = document.getElementById('qr-' + ticket.ticketId);
+        if (qrContainer && typeof QRCode !== 'undefined') {
             qrContainer.innerHTML = '';
             new QRCode(qrContainer, {
                 text: ticket.verifyUrl,
-                width: 110,
-                height: 110,
+                width: 80,
+                height: 80,
                 colorDark: '#1a1a2e',
                 colorLight: '#ffffff',
-                correctLevel: QRCode.CorrectLevel.H
+                correctLevel: QRCode. CorrectLevel.H
             });
         }
     }, 100);
 }
 
 function closeModal() {
-    const modal = document.getElementById('ticketPreviewModal');
+    var modal = document. getElementById('ticketPreviewModal');
     modal.classList.remove('active');
 }
 
 // ================================================
-// TICKET DESIGN - FRONT
+// PROFESSIONAL TICKET DESIGN - FRONT (5. 5cm x 2cm)
 // ================================================
 function createTicketFrontHTML(ticket) {
-    return `
-        <div style="
-            width: 380px;
-            height: 580px;
-            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
-            border-radius: 20px;
-            padding: 25px;
-            position: relative;
-            overflow: hidden;
-            font-family: 'Montserrat', Arial, sans-serif;
-            color: white;
-            box-shadow: 0 20px 60px rgba(0,0,0,0.5);
-        ">
-            <!-- Watermark Pattern -->
-            <div style="
-                position: absolute;
-                top: 0; left: 0; right: 0; bottom: 0;
-                background: repeating-linear-gradient(
-                    45deg,
-                    transparent,
-                    transparent 25px,
-                    rgba(212, 175, 55, 0.03) 25px,
-                    rgba(212, 175, 55, 0.03) 50px
-                );
-                pointer-events: none;
-            "></div>
+    var w = CONFIG.ticketWidth;
+    var h = CONFIG. ticketHeight;
+    
+    return '<div class="ticket-front" style="' +
+        'width:' + w + 'px;' +
+        'height:' + h + 'px;' +
+        'background:linear-gradient(135deg,#1a1a2e 0%,#16213e 50%,#0f3460 100%);' +
+        'border-radius:12px;' +
+        'position:relative;' +
+        'overflow:hidden;' +
+        'font-family:Arial,sans-serif;' +
+        'color:white;' +
+        'box-shadow:0 4px 15px rgba(0,0,0,0.3);' +
+        '">' +
+        
+        // Security pattern watermark
+        '<div style="position:absolute;top:0;left:0;right:0;bottom:0;' +
+        'background:repeating-linear-gradient(45deg,transparent,transparent 10px,rgba(212,175,55,0.03) 10px,rgba(212,175,55,0. 03) 20px);' +
+        'pointer-events:none;"></div>' +
+        
+        // Diagonal watermark text
+        '<div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%) rotate(-25deg);' +
+        'font-size:28px;font-weight:900;color:rgba(212,175,55,0.06);white-space:nowrap;' +
+        'letter-spacing:8px;pointer-events:none;">EKINTABULI</div>' +
+        
+        // Micro text watermark line
+        '<div style="position:absolute;bottom:3px;left:0;right:0;overflow:hidden;height:8px;">' +
+        '<div style="font-size:4px;color:rgba(212,175,55,0.15);white-space:nowrap;letter-spacing:1px;">' +
+        'EKINTABULI-AUTHENTIC-VERIFIED-SECURE-EKINTABULI-AUTHENTIC-VERIFIED-SECURE-EKINTABULI-AUTHENTIC-VERIFIED-SECURE-EKINTABULI' +
+        '</div></div>' +
+        
+        // Gold border
+        '<div style="position:absolute;top:4px;left:4px;right:4px;bottom:4px;' +
+        'border:1. 5px solid rgba(212,175,55,0.5);border-radius:10px;pointer-events:none;"></div>' +
+        
+        // Left section - Event info
+        '<div style="position:absolute;left:12px;top:12px;bottom:12px;width:55%;">' +
+            // Header
+            '<div style="margin-bottom:8px;">' +
+                '<div style="font-size:6px;color:#D4AF37;letter-spacing:2px;text-transform:uppercase;">Christmas Event 2025</div>' +
+                '<div style="font-size:18px;font-weight:bold;color:#D4AF37;text-shadow:1px 1px 2px rgba(0,0,0,0.5);">EKINTABULI</div>' +
+            '</div>' +
             
-            <!-- Diagonal Watermark Text -->
-            <div style="
-                position: absolute;
-                top: 50%; left: 50%;
-                transform: translate(-50%, -50%) rotate(-45deg);
-                font-size: 45px;
-                font-weight: 900;
-                color: rgba(212, 175, 55, 0. 05);
-                white-space: nowrap;
-                pointer-events: none;
-                letter-spacing: 10px;
-            ">EKINTABULI</div>
+            // Event details
+            '<div style="display:flex;gap:15px;margin-bottom:6px;">' +
+                '<div>' +
+                    '<div style="font-size:5px;color:#888;">DATE</div>' +
+                    '<div style="font-size:8px;font-weight:600;">25 DEC 2025</div>' +
+                '</div>' +
+                '<div>' +
+                    '<div style="font-size:5px;color:#888;">TIME</div>' +
+                    '<div style="font-size:8px;font-weight:600;">6PM - LATE</div>' +
+                '</div>' +
+            '</div>' +
             
-            <!-- Gold Border -->
-            <div style="
-                position: absolute;
-                top: 8px; left: 8px; right: 8px; bottom: 8px;
-                border: 2px solid rgba(212, 175, 55, 0.4);
-                border-radius: 15px;
-                pointer-events: none;
-            "></div>
+            '<div style="margin-bottom:6px;">' +
+                '<div style="font-size:5px;color:#888;">VENUE</div>' +
+                '<div style="font-size:8px;font-weight:600;">Club Missouka</div>' +
+            '</div>' +
             
-            <!-- Corner Icons -->
-            <div style="position: absolute; top: 18px; left: 18px; font-size: 24px;">👑</div>
-            <div style="position: absolute; top: 18px; right: 18px; font-size: 24px;">🎄</div>
+            // Ticket ID and Price
+            '<div style="display:flex;justify-content:space-between;padding:6px 8px;' +
+            'background:rgba(212,175,55,0. 15);border-radius:6px;border:1px solid rgba(212,175,55,0.3);">' +
+                '<div>' +
+                    '<div style="font-size:5px;color:#888;">TICKET ID</div>' +
+                    '<div style="font-size:7px;font-weight:700;color:#D4AF37;">' + ticket.ticketId + '</div>' +
+                '</div>' +
+                '<div style="text-align:right;">' +
+                    '<div style="font-size:5px;color:#888;">PRICE</div>' +
+                    '<div style="font-size:7px;font-weight:700;color:#28a745;">10,000 UGX</div>' +
+                '</div>' +
+            '</div>' +
             
-            <!-- Header -->
-            <div style="text-align: center; margin-top: 30px; position: relative; z-index: 1;">
-                <div style="font-size: 10px; color: #D4AF37; letter-spacing: 3px; margin-bottom: 5px; text-transform: uppercase;">Exclusive Christmas Event</div>
-                <div style="font-family: Georgia, serif; font-size: 34px; font-weight: bold; color: #D4AF37; text-shadow: 2px 2px 4px rgba(0,0,0,0.5);">EKINTABULI</div>
-                <div style="font-size: 14px; color: #aaa; margin-top: 3px;">Kya Christmas 2025</div>
-            </div>
-            
-            <!-- Event Info -->
-            <div style="margin-top: 30px; position: relative; z-index: 1;">
-                <div style="display: flex; justify-content: space-between; margin-bottom: 10px; padding: 12px; background: rgba(212, 175, 55, 0. 1); border-radius: 8px; border: 1px solid rgba(212, 175, 55, 0.2);">
-                    <div>
-                        <div style="font-size: 9px; color: #888; margin-bottom: 3px;">📅 DATE</div>
-                        <div style="font-weight: 600; font-size: 12px;">25th December 2025</div>
-                    </div>
-                    <div style="text-align: right;">
-                        <div style="font-size: 9px; color: #888; margin-bottom: 3px;">⏰ TIME</div>
-                        <div style="font-weight: 600; font-size: 12px;">6:00 PM - Late</div>
-                    </div>
-                </div>
-                
-                <div style="padding: 12px; background: rgba(212, 175, 55, 0. 1); border-radius: 8px; border: 1px solid rgba(212, 175, 55, 0.2); margin-bottom: 10px;">
-                    <div style="font-size: 9px; color: #888; margin-bottom: 3px;">📍 VENUE</div>
-                    <div style="font-weight: 600; font-size: 12px;">Club Missouka</div>
-                </div>
-                
-                <div style="display: flex; justify-content: space-between; padding: 12px; background: rgba(40, 167, 69, 0.1); border-radius: 8px; border: 1px solid rgba(40, 167, 69, 0.2);">
-                    <div>
-                        <div style="font-size: 9px; color: #888; margin-bottom: 3px;">🎫 TICKET ID</div>
-                        <div style="font-weight: 700; font-size: 13px; color: #D4AF37;">${ticket.ticketId}</div>
-                    </div>
-                    <div style="text-align: right;">
-                        <div style="font-size: 9px; color: #888; margin-bottom: 3px;">💵 PRICE</div>
-                        <div style="font-weight: 700; font-size: 13px; color: #28a745;">10,000 UGX</div>
-                    </div>
-                </div>
-            </div>
-            
-            <!-- QR Code -->
-            <div style="text-align: center; margin-top: 20px; position: relative; z-index: 1;">
-                <div style="display: inline-block; padding: 10px; background: white; border-radius: 10px; box-shadow: 0 5px 15px rgba(0,0,0,0.3);">
-                    <div id="qr-${ticket.ticketId}" style="width: 110px; height: 110px;"></div>
-                </div>
-                <div style="margin-top: 8px; font-size: 9px; color: #888;">Scan with phone camera to verify</div>
-            </div>
-            
-            <!-- Footer -->
-            <div style="position: absolute; bottom: 18px; left: 25px; right: 25px; text-align: center; z-index: 1;">
-                <div style="font-size: 8px; color: #666; border-top: 1px solid rgba(212, 175, 55, 0.2); padding-top: 10px;">
-                    🔒 This ticket is digitally protected and verified<br>
-                    <span style="color: #D4AF37;">Valid for ONE person only • Present at gate</span>
-                </div>
-            </div>
-        </div>
-    `;
+            // Security text
+            '<div style="position:absolute;bottom:0;font-size:4px;color:#666;">' +
+                '🔒 Digitally secured • Valid for ONE person' +
+            '</div>' +
+        '</div>' +
+        
+        // Right section - QR Code
+        '<div style="position:absolute;right:12px;top:50%;transform:translateY(-50%);text-align:center;">' +
+            '<div style="padding:6px;background:white;border-radius:6px;box-shadow:0 2px 8px rgba(0,0,0,0.3);">' +
+                '<div id="qr-' + ticket.ticketId + '" style="width:80px;height:80px;"></div>' +
+            '</div>' +
+            '<div style="margin-top:4px;font-size:5px;color:#888;">SCAN TO VERIFY</div>' +
+        '</div>' +
+        
+        // Corner decorations
+        '<div style="position:absolute;top:8px;left:8px;font-size:10px;">👑</div>' +
+        '<div style="position:absolute;top:8px;right:8px;font-size:10px;">🎄</div>' +
+        
+    '</div>';
 }
 
 // ================================================
-// TICKET DESIGN - BACK
+// PROFESSIONAL TICKET DESIGN - BACK
 // ================================================
 function createTicketBackHTML(ticket) {
-    return `
-        <div style="
-            width: 380px;
-            height: 580px;
-            background: linear-gradient(135deg, #0f3460 0%, #16213e 50%, #1a1a2e 100%);
-            border-radius: 20px;
-            padding: 25px;
-            position: relative;
-            overflow: hidden;
-            font-family: 'Montserrat', Arial, sans-serif;
-            color: white;
-            box-shadow: 0 20px 60px rgba(0,0,0,0. 5);
-        ">
-            <!-- Security Pattern -->
-            <div style="
-                position: absolute;
-                top: 0; left: 0; right: 0; bottom: 0;
-                background: 
-                    repeating-linear-gradient(0deg, transparent, transparent 15px, rgba(212,175,55,0.015) 15px, rgba(212,175,55,0. 015) 16px),
-                    repeating-linear-gradient(90deg, transparent, transparent 15px, rgba(212,175,55,0.015) 15px, rgba(212,175,55,0.015) 16px);
-                pointer-events: none;
-            "></div>
-            
-            <!-- Border -->
-            <div style="
-                position: absolute;
-                top: 8px; left: 8px; right: 8px; bottom: 8px;
-                border: 2px solid rgba(212, 175, 55, 0.4);
-                border-radius: 15px;
-                pointer-events: none;
-            "></div>
-            
-            <!-- Header -->
-            <div style="text-align: center; margin-top: 15px; position: relative; z-index: 1;">
-                <div style="font-size: 20px; margin-bottom: 5px;">🎫</div>
-                <div style="font-size: 11px; color: #D4AF37; letter-spacing: 2px;">TERMS & CONDITIONS</div>
-            </div>
-            
-            <!-- Terms -->
-            <div style="margin-top: 20px; position: relative; z-index: 1; font-size: 10px; line-height: 1.6; color: #ccc;">
-                <div style="margin-bottom: 12px; padding: 10px; background: rgba(0,0,0,0.2); border-radius: 8px; border-left: 3px solid #D4AF37;">
-                    <strong style="color: #D4AF37;">1. Single Use Only</strong><br>
-                    This ticket can only be scanned once at the gate.  After scanning, it cannot be reused.
-                </div>
-                
-                <div style="margin-bottom: 12px; padding: 10px; background: rgba(0,0,0,0.2); border-radius: 8px; border-left: 3px solid #D4AF37;">
-                    <strong style="color: #D4AF37;">2. Non-Transferable</strong><br>
-                    Once scanned, this ticket is linked to the holder and cannot be transferred. 
-                </div>
-                
-                <div style="margin-bottom: 12px; padding: 10px; background: rgba(0,0,0,0.2); border-radius: 8px; border-left: 3px solid #D4AF37;">
-                    <strong style="color: #D4AF37;">3.  Verification Required</strong><br>
-                    Present valid ID matching ticket holder name if requested.
-                </div>
-                
-                <div style="margin-bottom: 12px; padding: 10px; background: rgba(0,0,0,0.2); border-radius: 8px; border-left: 3px solid #D4AF37;">
-                    <strong style="color: #D4AF37;">4. No Refunds</strong><br>
-                    Tickets are non-refundable. Event occurs rain or shine.
-                </div>
-                
-                <div style="padding: 10px; background: rgba(220,53,69,0. 1); border-radius: 8px; border-left: 3px solid #dc3545;">
-                    <strong style="color: #dc3545;">⚠️ Anti-Fraud Notice</strong><br>
-                    Counterfeit tickets will be confiscated.  Violators will be prosecuted.
-                </div>
-            </div>
-            
-            <!-- Security Badge -->
-            <div style="position: absolute; bottom: 80px; left: 50%; transform: translateX(-50%); text-align: center; z-index: 1;">
-                <div style="display: inline-block; padding: 8px 20px; background: rgba(212, 175, 55, 0. 1); border: 1px solid rgba(212, 175, 55, 0.3); border-radius: 20px;">
-                    <span style="font-size: 10px; color: #D4AF37;">🔐 VERIFIED AUTHENTIC</span>
-                </div>
-            </div>
-            
-            <!-- Footer -->
-            <div style="position: absolute; bottom: 18px; left: 25px; right: 25px; text-align: center; z-index: 1;">
-                <div style="font-size: 9px; color: #666;">
-                    <strong style="color: #D4AF37;">EKINTABULI Kya Christmas 2025</strong><br>
-                    📞 Contact: +256 XXX XXX XXX<br>
-                    Ticket #${ticket.ticketNumber || '000'} | Generated: ${new Date().toLocaleDateString()}
-                </div>
-            </div>
-        </div>
-    `;
+    var w = CONFIG.ticketWidth;
+    var h = CONFIG.ticketHeight;
+    
+    return '<div class="ticket-back" style="' +
+        'width:' + w + 'px;' +
+        'height:' + h + 'px;' +
+        'background:linear-gradient(135deg,#0f3460 0%,#16213e 50%,#1a1a2e 100%);' +
+        'border-radius:12px;' +
+        'position:relative;' +
+        'overflow:hidden;' +
+        'font-family:Arial,sans-serif;' +
+        'color:white;' +
+        'box-shadow:0 4px 15px rgba(0,0,0,0.3);' +
+        'padding:12px;' +
+        '">' +
+        
+        // Security grid pattern
+        '<div style="position:absolute;top:0;left:0;right:0;bottom:0;' +
+        'background:repeating-linear-gradient(0deg,transparent,transparent 8px,rgba(212,175,55,0.02) 8px,rgba(212,175,55,0. 02) 9px),' +
+        'repeating-linear-gradient(90deg,transparent,transparent 8px,rgba(212,175,55,0.02) 8px,rgba(212,175,55,0.02) 9px);' +
+        'pointer-events:none;"></div>' +
+        
+        // Border
+        '<div style="position:absolute;top:4px;left:4px;right:4px;bottom:4px;' +
+        'border:1. 5px solid rgba(212,175,55,0.5);border-radius:10px;pointer-events:none;"></div>' +
+        
+        // Header
+        '<div style="text-align:center;margin-bottom:8px;position:relative;z-index:1;">' +
+            '<div style="font-size:8px;color:#D4AF37;font-weight:bold;">TERMS & CONDITIONS</div>' +
+        '</div>' +
+        
+        // Terms in columns
+        '<div style="display:flex;gap:10px;font-size:5px;line-height:1. 4;color:#ccc;position:relative;z-index:1;">' +
+            '<div style="flex:1;">' +
+                '<div style="margin-bottom:4px;"><strong style="color:#D4AF37;">1.</strong> Single use only - one scan per entry</div>' +
+                '<div style="margin-bottom:4px;"><strong style="color:#D4AF37;">2. </strong> Non-transferable after scanning</div>' +
+                '<div><strong style="color:#D4AF37;">3.</strong> Present valid ID if requested</div>' +
+            '</div>' +
+            '<div style="flex:1;">' +
+                '<div style="margin-bottom:4px;"><strong style="color:#D4AF37;">4.</strong> No refunds - event rain or shine</div>' +
+                '<div style="margin-bottom:4px;"><strong style="color:#dc3545;">⚠️</strong> Counterfeit tickets prosecuted</div>' +
+                '<div><strong style="color:#28a745;">✓</strong> Verified authentic ticket</div>' +
+            '</div>' +
+        '</div>' +
+        
+        // Security badge
+        '<div style="position:absolute;bottom:25px;left:50%;transform:translateX(-50%);">' +
+            '<div style="padding:3px 12px;background:rgba(212,175,55,0.15);border:1px solid rgba(212,175,55,0.4);border-radius:10px;">' +
+                '<span style="font-size:6px;color:#D4AF37;">🔐 VERIFIED AUTHENTIC</span>' +
+            '</div>' +
+        '</div>' +
+        
+        // Footer
+        '<div style="position:absolute;bottom:8px;left:12px;right:12px;text-align:center;font-size:5px;color:#666;">' +
+            '<strong style="color:#D4AF37;">EKINTABULI Kya Christmas 2025</strong> • ' +
+            'Ticket #' + (ticket.ticketNumber || '000') + ' • ' +
+            'Hash: ' + (ticket.securityHash || 'N/A') +
+        '</div>' +
+        
+    '</div>';
 }
 
 // ================================================
-// DOWNLOAD AS ZIP
+// DOWNLOAD AS ZIP (PNG)
 // ================================================
 async function downloadAsZip() {
     if (allTickets.length === 0) {
@@ -899,68 +787,123 @@ async function downloadAsZip() {
         return;
     }
     
-    const btn = document.getElementById('downloadZipBtn');
+    var btn = document.getElementById('downloadZipBtn');
     btn.disabled = true;
-    btn.innerHTML = '⏳ Preparing... ';
+    btn.innerHTML = 'Preparing... ';
     
-    showNotification('Preparing tickets for download...  This may take a moment.', 'warning');
+    var ticketCount = Math.min(allTickets. length, 50);
+    showNotification('Generating ' + ticketCount + ' tickets...  This may take a moment.', 'warning');
     
     try {
-        const zip = new JSZip();
-        const ticketsFolder = zip.folder("EKINTABULI_Tickets");
+        var zip = new JSZip();
+        var ticketsFolder = zip.folder("EKINTABULI_Tickets");
+        var canvas = document.getElementById('ticketCanvas');
         
-        const canvas = document.getElementById('ticketCanvas');
-        
-        // Generate first 10 tickets as sample (full generation would take too long)
-        const ticketsToExport = allTickets.slice(0, 10);
-        
-        for (let i = 0; i < ticketsToExport.length; i++) {
-            const ticket = ticketsToExport[i];
+        for (var i = 0; i < ticketCount; i++) {
+            var ticket = allTickets[i];
             
-            // Create front
+            // Front
             canvas.innerHTML = createTicketFrontHTML(ticket);
-            
-            // Generate QR code
-            const qrContainer = canvas.querySelector(`#qr-${ticket.ticketId}`);
-            if (qrContainer) {
+            var qrContainer = document. getElementById('qr-' + ticket.ticketId);
+            if (qrContainer && typeof QRCode !== 'undefined') {
                 new QRCode(qrContainer, {
                     text: ticket.verifyUrl,
-                    width: 110,
-                    height: 110,
+                    width: 80,
+                    height: 80,
                     colorDark: '#1a1a2e',
                     colorLight: '#ffffff'
                 });
             }
-            
-            await sleep(100);
-            
-            const frontCanvas = await html2canvas(canvas. firstChild, { scale: 2, useCORS: true });
-            const frontData = frontCanvas.toDataURL('image/png'). split(',')[1];
-            ticketsFolder.file(`${ticket.ticketId}_FRONT.png`, frontData, { base64: true });
-            
-            // Create back
-            canvas. innerHTML = createTicketBackHTML(ticket);
             await sleep(50);
             
-            const backCanvas = await html2canvas(canvas.firstChild, { scale: 2, useCORS: true });
-            const backData = backCanvas.toDataURL('image/png').split(',')[1];
-            ticketsFolder. file(`${ticket. ticketId}_BACK.png`, backData, { base64: true });
+            var frontCanvas = await html2canvas(canvas. firstChild, { scale: CONFIG.printScale, useCORS: true, backgroundColor: null });
+            var frontData = frontCanvas.toDataURL('image/png'). split(',')[1];
+            ticketsFolder.file(ticket.ticketId + '_FRONT.png', frontData, { base64: true });
             
-            btn.innerHTML = `⏳ ${i + 1}/${ticketsToExport.length}`;
+            // Back
+            canvas.innerHTML = createTicketBackHTML(ticket);
+            await sleep(30);
+            
+            var backCanvas = await html2canvas(canvas.firstChild, { scale: CONFIG.printScale, useCORS: true, backgroundColor: null });
+            var backData = backCanvas.toDataURL('image/png'). split(',')[1];
+            ticketsFolder.file(ticket. ticketId + '_BACK.png', backData, { base64: true });
+            
+            btn.innerHTML = (i + 1) + '/' + ticketCount;
         }
         
-        // Generate ZIP
-        const content = await zip.generateAsync({ type: 'blob' });
-        saveAs(content, 'EKINTABULI_Tickets_Sample.zip');
-        
-        showNotification('Download started! (Sample of first 10 tickets)', 'success');
+        var content = await zip.generateAsync({ type: 'blob' });
+        saveAs(content, 'EKINTABULI_Tickets.zip');
+        showNotification('Downloaded ' + ticketCount + ' tickets as ZIP!', 'success');
         
     } catch (error) {
-        console. error('Download error:', error);
-        showNotification('Download failed: ' + error. message, 'error');
+        console.error('Download error:', error);
+        showNotification('Download failed: ' + error.message, 'error');
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = '📥 Download ZIP';
+    }
+}
+
+// ================================================
+// DOWNLOAD AS PDF (Both Sides)
+// ================================================
+async function downloadAsPdf() {
+    if (allTickets. length === 0) {
+        showNotification('No tickets to download!', 'error');
+        return;
+    }
+    
+    if (typeof jspdf === 'undefined' && typeof jsPDF === 'undefined') {
+        showNotification('PDF library not loaded.  Use ZIP download instead.', 'error');
+        return;
+    }
+    
+    var btn = document.getElementById('downloadPdfBtn');
+    btn. disabled = true;
+    btn.innerHTML = 'Creating PDF...';
+    
+    try {
+        var PDF = window.jspdf ?  window.jspdf. jsPDF : window.jsPDF;
+        var doc = new PDF({ orientation: 'landscape', unit: 'cm', format: [5.5, 2] });
+        var canvas = document.getElementById('ticketCanvas');
+        var ticketCount = Math.min(allTickets.length, 20);
+        
+        for (var i = 0; i < ticketCount; i++) {
+            var ticket = allTickets[i];
+            
+            if (i > 0) doc. addPage([5.5, 2], 'landscape');
+            
+            // Front
+            canvas. innerHTML = createTicketFrontHTML(ticket);
+            var qrContainer = document. getElementById('qr-' + ticket.ticketId);
+            if (qrContainer && typeof QRCode !== 'undefined') {
+                new QRCode(qrContainer, { text: ticket.verifyUrl, width: 80, height: 80, colorDark: '#1a1a2e', colorLight: '#ffffff' });
+            }
+            await sleep(50);
+            var frontCanvas = await html2canvas(canvas. firstChild, { scale: 3, useCORS: true });
+            var frontImg = frontCanvas.toDataURL('image/png');
+            doc.addImage(frontImg, 'PNG', 0, 0, 5.5, 2);
+            
+            // Back on next page
+            doc.addPage([5.5, 2], 'landscape');
+            canvas.innerHTML = createTicketBackHTML(ticket);
+            await sleep(30);
+            var backCanvas = await html2canvas(canvas. firstChild, { scale: 3, useCORS: true });
+            var backImg = backCanvas. toDataURL('image/png');
+            doc.addImage(backImg, 'PNG', 0, 0, 5.5, 2);
+            
+            btn.innerHTML = (i + 1) + '/' + ticketCount;
+        }
+        
+        doc.save('EKINTABULI_Tickets.pdf');
+        showNotification('Downloaded ' + ticketCount + ' tickets as PDF!', 'success');
+        
+    } catch (error) {
+        console. error('PDF error:', error);
+        showNotification('PDF failed: ' + error. message, 'error');
     } finally {
         btn. disabled = false;
-        btn.innerHTML = '📥 Download ZIP (PNG)';
+        btn.innerHTML = '📄 Download PDF';
     }
 }
 
@@ -973,32 +916,20 @@ function exportReport() {
         return;
     }
     
-    let csv = 'Ticket ID,Status,Created At,Sold At,Used At,Price\n';
+    var csv = 'Ticket ID,Status,Created At,Sold At,Used At,Price,Security Hash\n';
+    for (var i = 0; i < allTickets.length; i++) {
+        var t = allTickets[i];
+        csv += '"' + t.ticketId + '","' + t.status + '","' + (t.createdAt || '') + '","' + (t.soldAt || '') + '","' + (t. usedAt || '') + '","' + t.price + '","' + (t.securityHash || '') + '"\n';
+    }
     
-    allTickets. forEach(ticket => {
-        csv += `"${ticket.ticketId}","${ticket.status}","${ticket.createdAt || ''}","${ticket. soldAt || ''}","${ticket.usedAt || ''}","${ticket.price}"\n`;
-    });
-    
-    const blob = new Blob([csv], { type: 'text/csv' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a. download = `EKINTABULI_Tickets_Report_${new Date().toISOString().split('T')[0]}.csv`;
+    var blob = new Blob([csv], { type: 'text/csv' });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a. href = url;
+    a.download = 'EKINTABULI_Report_' + new Date(). toISOString(). split('T')[0] + '.csv';
     a.click();
-    URL.revokeObjectURL(url);
-    
+    URL. revokeObjectURL(url);
     showNotification('CSV report downloaded! ', 'success');
 }
 
-// ================================================
-// LOGOUT
-// ================================================
-function logout() {
-    if (confirm('Are you sure you want to logout?')) {
-        sessionStorage.clear();
-        localStorage.removeItem('ekintabuli_auth');
-        window.location.href = '../index.html';
-    }
-}
-
-console.log('✅ Admin. js loaded successfully');
+console.log('Admin. js loaded successfully');
