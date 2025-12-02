@@ -4,13 +4,12 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Admin Dashboard - EKINTABULI</title>
-    <link rel="stylesheet" href="../shared/styles.css">
     <link rel="stylesheet" href="style.css">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver. min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <link href="https://fonts. googleapis.com/css2?family=Playfair+Display:wght@400;700;900&family=Montserrat:wght@400;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10. 1/jszip.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+    <script src="https://cdnjs. cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 </head>
 <body>
     <div class="header">
@@ -20,7 +19,7 @@
         </div>
         <div class="header-right">
             <span class="event-info">📅 25th Dec 2025 | 📍 Club Missouka</span>
-            <button class="btn btn-secondary" onclick="logout()">🚪 Logout</button>
+            <button class="btn btn-secondary" id="logoutBtn">🚪 Logout</button>
         </div>
     </div>
 
@@ -84,7 +83,7 @@
                 <span class="badge" id="ticketBadge">Ready</span>
             </div>
             <div class="card-body">
-                <p class="card-description">Generate 400 unique two-sided tickets with encrypted QR codes and watermark protection for EKINTABULI Kya Christmas. </p>
+                <p class="card-description">Generate unique two-sided tickets with encrypted QR codes and watermark protection for EKINTABULI Kya Christmas.</p>
                 
                 <div class="generation-options">
                     <div class="option-group">
@@ -105,14 +104,14 @@
                 </div>
 
                 <div class="button-group">
-                    <button class="btn btn-primary btn-large" id="generateBtn" onclick="generateAllTickets()">
+                    <button class="btn btn-primary btn-large" id="generateBtn">
                         🎫 Generate Tickets
                     </button>
-                    <button class="btn btn-secondary" id="downloadZipBtn" onclick="downloadAsZip()" disabled>
+                    <button class="btn btn-secondary" id="downloadZipBtn" disabled>
                         📥 Download ZIP (PNG)
                     </button>
-                    <button class="btn btn-secondary" id="downloadPdfBtn" onclick="downloadAsPdf()" disabled>
-                        📄 Download PDF
+                    <button class="btn btn-secondary" id="previewBtn" disabled>
+                        👁️ Preview Ticket
                     </button>
                 </div>
             </div>
@@ -162,19 +161,19 @@
         <div class="card">
             <div class="card-header">
                 <span>📋 Ticket Management</span>
-                <button class="btn btn-small btn-primary" onclick="refreshTickets()">🔄 Refresh</button>
+                <button class="btn btn-small btn-primary" id="refreshBtn">🔄 Refresh</button>
             </div>
             <div class="card-body">
                 <div class="filter-bar">
-                    <input type="text" id="searchTicket" placeholder="🔍 Search ticket ID..." class="search-input" onkeyup="filterTickets()">
-                    <select id="filterStatus" onchange="filterTickets()" class="filter-select">
+                    <input type="text" id="searchTicket" placeholder="🔍 Search ticket ID..." class="search-input">
+                    <select id="filterStatus" class="filter-select">
                         <option value="all">All Status</option>
                         <option value="GENERATED">📦 Generated</option>
                         <option value="DOWNLOADED">📥 Downloaded</option>
                         <option value="SOLD">💰 Sold</option>
                         <option value="USED">✅ Used</option>
                     </select>
-                    <button class="btn btn-secondary" onclick="exportReport()">📊 Export CSV</button>
+                    <button class="btn btn-secondary" id="exportBtn">📊 Export CSV</button>
                 </div>
                 
                 <div class="table-container">
@@ -184,14 +183,12 @@
                                 <th>Ticket ID</th>
                                 <th>Status</th>
                                 <th>Generated</th>
-                                <th>Sold At</th>
-                                <th>Used At</th>
                                 <th>Actions</th>
                             </tr>
                         </thead>
                         <tbody id="ticketTableBody">
                             <tr>
-                                <td colspan="6" class="empty-state">
+                                <td colspan="4" class="empty-state">
                                     <div class="empty-icon">🎫</div>
                                     <p>No tickets generated yet</p>
                                     <p class="empty-hint">Click "Generate Tickets" to create your event tickets</p>
@@ -241,21 +238,6 @@
                 </div>
             </div>
         </div>
-
-        <!-- Security Log Card -->
-        <div class="card">
-            <div class="card-header">
-                <span>🔐 Security Log</span>
-                <button class="btn btn-small btn-danger" onclick="clearSecurityLog()">🗑️ Clear</button>
-            </div>
-            <div class="card-body">
-                <div id="securityLog" class="security-log">
-                    <div class="empty-state">
-                        <p>No security events recorded</p>
-                    </div>
-                </div>
-            </div>
-        </div>
     </div>
 
     <!-- Ticket Preview Modal -->
@@ -263,10 +245,15 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h2>🎫 Ticket Preview</h2>
-                <button class="modal-close" onclick="closeModal()">&times;</button>
+                <button class="modal-close" id="closeModalBtn">&times;</button>
             </div>
             <div class="modal-body">
-                <div class="ticket-preview-container" id="ticketPreviewContainer"></div>
+                <div class="ticket-preview-wrapper">
+                    <h3>Front Side</h3>
+                    <div id="ticketFrontPreview"></div>
+                    <h3 style="margin-top: 30px;">Back Side</h3>
+                    <div id="ticketBackPreview"></div>
+                </div>
             </div>
         </div>
     </div>
@@ -274,24 +261,13 @@
     <!-- Hidden canvas for ticket generation -->
     <div id="ticketCanvas" style="position: absolute; left: -9999px; top: -9999px;"></div>
 
+    <!-- Notification Container -->
+    <div id="notificationContainer"></div>
+
     <!-- Firebase SDK -->
     <script src="https://www.gstatic. com/firebasejs/9.22.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat. js"></script>
     <script src="../shared/firebase-config.js"></script>
-    <script src="../shared/auth. js"></script>
-    <script src="../shared/security. js"></script>
-    <script src="../shared/database.js"></script>
     <script src="admin. js"></script>
-    <script>
-        // Check authentication
-        if (!checkAuth('admin')) {
-            window.location.href = '../index.html';
-        }
-        
-        // Initialize dashboard when DOM is ready
-        document.addEventListener('DOMContentLoaded', function() {
-            initializeDashboard();
-        });
-    </script>
 </body>
 </html>
