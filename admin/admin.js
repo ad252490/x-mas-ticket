@@ -62,9 +62,11 @@ function formatTimestamp(timestamp) {
 }
 
 function getVerifyUrl() {
-    var currentUrl = window.location. href;
-    var baseUrl = currentUrl. replace('/admin/index.html', '/verify/index.html'). replace('/admin/', '/verify/');
-    return baseUrl. split('?')[0];
+    // YOUR PRODUCTION URL - CHANGE THIS TO YOUR ACTUAL DEPLOYED URL
+    var productionUrl = 'https://ad252490.github.io/x-mas-ticket/verify/index.html';
+    
+    // Always use production URL for QR codes
+    return productionUrl;
 }
 
 function showNotification(message, type) {
