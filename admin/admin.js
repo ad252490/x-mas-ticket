@@ -1,6 +1,6 @@
 /* ================================================
    EKINTABULI Admin - FINAL GOLD/RED SECURE EDITION
-   Fixed Filters, Red Text, Watermarks, Dual-Zip
+   Fixed Downloads: Non‑empty PNGs & PDFs
    ================================================ */
 
 // ================================================
@@ -9,11 +9,11 @@
 const CONFIG = {
     eventName: 'EKINTABULI',
     eventSub: 'Christmas 2025',
-    secretKey: 'EKINTABULI-2025-XMAS-SECRET', 
-    ticketPrice: 10000, 
-    ticketWidth: 600, 
+    secretKey: 'EKINTABULI-2025-XMAS-SECRET',
+    ticketPrice: 10000,
+    ticketWidth: 600,
     ticketHeight: 220,
-    printScale: 3 
+    printScale: 3
 };
 
 // ================================================
@@ -54,15 +54,33 @@ function updateDashboard() {
         if(t.status === 'USED') s.used++;
     });
 
-    document.getElementById('statGenerated').textContent = s.gen;
-    document.getElementById('statSold').textContent = s.sold;
-    document.getElementById('statUsed').textContent = s.used;
-    document.getElementById('statRevenue').textContent = formatCurrency(s.rev);
-    
+    const g = id => document.getElementById(id);
+    if (g('statGenerated')) g('statGenerated').textContent = s.gen;
+    if (g('statSold')) g('statSold').textContent = s.sold;
+    if (g('statUsed')) g('statUsed').textContent = s.used;
+    if (g('statRevenue')) g('statRevenue').textContent = formatCurrency(s.rev);
+
     const hasData = s.gen > 0;
-    ['downloadPdfBtn', 'downloadZipBtn', 'exportBtn', 'previewBtn'].forEach(id => {
+    ['downloadPdfBtn', 'downloadZipBtn', 'exportBtn'].forEach(id => {
         const b = document.getElementById(id);
-        if(b) b.disabled = !hasData;
+        if (b) b.disabled = !hasData;
+    });
+}
+
+// Wait until QRCode has actually rendered an <img> or <canvas>
+function waitForQRCodeRendered(container) {
+    return new Promise(resolve => {
+        if (!container) return resolve();
+        const existing = container.querySelector('img,canvas');
+        if (existing) return resolve();
+        const obs = new MutationObserver(() => {
+            const img = container.querySelector('img,canvas');
+            if (img) {
+                obs.disconnect();
+                resolve();
+            }
+        });
+        obs.observe(container, { childList: true, subtree: true });
     });
 }
 
@@ -89,37 +107,64 @@ function encryptTicketCode(id) {
 // ================================================
 document.addEventListener('DOMContentLoaded', () => {
     console.log("System Started");
+
+    // Ensure ticketCanvas is hidden but renderable
+    const ticketCanvas = document.getElementById('ticketCanvas');
+    if (ticketCanvas) {
+        ticketCanvas.style.position = 'fixed';
+        ticketCanvas.style.top = '-10000px';
+        ticketCanvas.style.left = '-10000px';
+        ticketCanvas.style.zIndex = '-1';
+        ticketCanvas.style.visibility = 'visible';
+        // do NOT use display:none
+    }
+
     if(typeof firebase !== 'undefined' && typeof db !== 'undefined' && db) {
         db.collection('tickets').limit(1).get().then(() => {
             isFirebaseConnected = true;
-            document.querySelector('.status-dot').style.background = '#00ff88';
-            document.querySelector('.status-text').textContent = 'Online';
+            const dot = document.querySelector('.status-dot');
+            const txt = document.querySelector('.status-text');
+            if (dot) dot.style.background = '#00ff88';
+            if (txt) txt.textContent = 'Online';
             startRealTimeSync();
         }).catch(() => console.warn('Offline'));
     }
 
-    // Event Listeners
-    document.getElementById('generateBtn').addEventListener('click', generateTickets);
-    document.getElementById('clearDbBtn').addEventListener('click', clearDatabase);
-    document.getElementById('downloadPdfBtn').addEventListener('click', downloadDoubleSidedPdf);
-    document.getElementById('downloadZipBtn').addEventListener('click', downloadZip);
-    document.getElementById('exportBtn').addEventListener('click', exportCSV);
-    document.getElementById('previewBtn').addEventListener('click', () => showPreview(allTickets[0]?.ticketId));
-    document.getElementById('closeModalBtn').addEventListener('click', () => document.getElementById('ticketPreviewModal').classList.remove('active'));
-    
-    // Filter Listeners
-    document.getElementById('searchTicket').addEventListener('keyup', () => { currentPage=1; renderTable(); });
-    document.getElementById('filterStatus').addEventListener('change', () => { currentPage=1; renderTable(); });
-    document.getElementById('refreshBtn').addEventListener('click', () => { renderTable(); });
+    const byId = id => document.getElementById(id);
+
+    if (byId('generateBtn')) byId('generateBtn').addEventListener('click', generateTickets);
+    if (byId('clearDbBtn')) byId('clearDbBtn').addEventListener('click', clearDatabase);
+    if (byId('downloadPdfBtn')) byId('downloadPdfBtn').addEventListener('click', downloadDoubleSidedPdf);
+    if (byId('downloadZipBtn')) byId('downloadZipBtn').addEventListener('click', downloadZip);
+    if (byId('exportBtn')) byId('exportBtn').addEventListener('click', exportCSV);
+
+    // Filters
+    if (byId('searchTicket')) byId('searchTicket').addEventListener('keyup', () => { currentPage=1; renderTable(); });
+    if (byId('filterStatus')) byId('filterStatus').addEventListener('change', () => { currentPage=1; renderTable(); });
+    if (byId('refreshBtn')) byId('refreshBtn').addEventListener('click', () => { renderTable(); });
+
+    // Modal
+    if (byId('closeModalBtn')) byId('closeModalBtn').addEventListener('click', () => {
+        const m = document.getElementById('ticketPreviewModal');
+        if (m) m.classList.remove('active');
+    });
 
     const local = localStorage.getItem('ekt_data');
-    if(local) { allTickets = JSON.parse(local); updateDashboard(); renderTable(); }
+    if(local) {
+        allTickets = JSON.parse(local);
+        updateDashboard();
+        renderTable();
+    }
 });
 
 function startRealTimeSync() {
     db.collection('tickets').orderBy('createdAt', 'desc').onSnapshot(snap => {
         allTickets = [];
-        snap.forEach(doc => { let d = doc.data(); d.ticketId = doc.id; allTickets.push(d); });
+        snap.forEach(doc => {
+            let d = doc.data();
+            d.ticketId = doc.id;
+            allTickets.push(d);
+        });
         localStorage.setItem('ekt_data', JSON.stringify(allTickets));
         updateDashboard();
         renderTable();
@@ -137,8 +182,10 @@ async function generateTickets() {
     const btn = document.getElementById('generateBtn');
     const bar = document.getElementById('progressFill');
     const txt = document.getElementById('progressText');
-    btn.disabled = true; 
-    document.getElementById('progressContainer').style.display='block';
+    btn.disabled = true;
+    if (document.getElementById('progressContainer')) {
+        document.getElementById('progressContainer').style.display='block';
+    }
 
     try {
         let temp = [];
@@ -152,7 +199,11 @@ async function generateTickets() {
                 encryptedCode: code,
                 createdAt: firebase.firestore.FieldValue.serverTimestamp()
             });
-            if(i%50===0) { bar.style.width=`${(i/count)*50}%`; txt.textContent=`Minting ${i}...`; await sleep(1); }
+            if(i%50===0 && bar && txt) {
+                bar.style.width=`${(i/count)*50}%`;
+                txt.textContent=`Minting ${i}...`;
+                await sleep(1);
+            }
         }
 
         const batches = [];
@@ -161,14 +212,21 @@ async function generateTickets() {
         for(let i=0; i<batches.length; i++) {
             const batch = db.batch();
             batches[i].forEach(t => batch.set(db.collection('tickets').doc(t.ticketId), t));
-            txt.textContent = `Saving Batch ${i+1}/${batches.length}...`;
+            if (txt) txt.textContent = `Saving Batch ${i+1}/${batches.length}...`;
             await batch.commit();
-            bar.style.width = `${50 + ((i+1)/batches.length*50)}%`;
+            if (bar) bar.style.width = `${50 + ((i+1)/batches.length*50)}%`;
         }
-        txt.textContent = 'Done!';
+        if (txt) txt.textContent = 'Done!';
         showNotification(`Created ${count} tickets.`);
-    } catch(e) { console.error(e); alert(e.message); } 
-    finally { btn.disabled = false; setTimeout(() => document.getElementById('progressContainer').style.display='none', 2000); }
+    } catch(e) {
+        console.error(e);
+        alert(e.message);
+    } finally {
+        btn.disabled = false;
+        if (document.getElementById('progressContainer')) {
+            setTimeout(() => document.getElementById('progressContainer').style.display='none', 2000);
+        }
+    }
 }
 
 async function clearDatabase() {
@@ -179,18 +237,15 @@ async function clearDatabase() {
     const batch = db.batch();
     q.docs.forEach(d => batch.delete(d.ref));
     await batch.commit();
-    updateDashboard(); renderTable();
+    updateDashboard();
+    renderTable();
 }
 
 // ================================================
 // 7. PREMIUM DESIGN (Red + Watermarks)
 // ================================================
-
-// 1. Repeating Text Watermark (SVG)
-// This creates a tiled background of "OFFICIAL ORIGINAL" rotated 45 degrees
 const watermarkSVG = `data:image/svg+xml;utf8,%3Csvg width='100' height='100' viewBox='0 0 100 100' xmlns='http://www.w3.org/2000/svg'%3E%3Cg transform='translate(50,50) rotate(-45)'%3E%3Ctext text-anchor='middle' font-family='Arial' font-size='10' fill='rgba(255,255,255,0.08)' font-weight='bold'%3EOFFICIAL ORIGINAL%3C/text%3E%3C/g%3E%3C/svg%3E`;
 
-// 2. Guilloche Waves (Security Lines)
 const guilloche = `data:image/svg+xml,%3Csvg width='40' height='40' viewBox='0 0 40 40' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M0 20 Q 10 0 20 20 T 40 20' fill='none' stroke='rgba(255,215,0,0.1)' stroke-width='0.5'/%3E%3C/svg%3E`;
 
 function createTicketFront(t) {
@@ -200,23 +255,17 @@ function createTicketFront(t) {
         border-radius: 16px; display: flex; overflow: hidden; position: relative; 
         font-family: 'Segoe UI', sans-serif; border: 1px solid #333;">
         
-        <!-- LAYER 1: Guilloche Waves -->
         <div style="position:absolute; inset:0; background-image: url('${guilloche}'); opacity:1;"></div>
-        
-        <!-- LAYER 2: Repeating Text Watermark (Anti-Copy) -->
         <div style="position:absolute; inset:0; background-image: url('${watermarkSVG}');"></div>
         
-        <!-- LEFT SIDE (Event Info) -->
         <div style="width: 72%; padding: 15px 20px; position: relative; border-right: 2px dashed rgba(212,175,55,0.5);
             display: flex; flex-direction: column; justify-content: space-between; z-index: 5;">
             
-            <!-- Top Bar -->
             <div style="display:flex; justify-content:space-between; align-items:center;">
                 <div style="font-size:9px; color:#d4af37; letter-spacing:2px; font-weight:bold; border:1px solid #d4af37; padding:2px 6px; border-radius:4px;">OFFICIAL PASS</div>
                 <div style="font-size:10px; color:#888; font-family:monospace;">ID: ${t.ticketId}</div>
             </div>
 
-            <!-- MAIN TITLE (RED) -->
             <div style="margin-top:5px;">
                 <div style="font-size:46px; font-weight:900; line-height:0.85; letter-spacing:-1px;
                     background: linear-gradient(to bottom, #ff4d4d 0%, #cc0000 100%); 
@@ -229,7 +278,6 @@ function createTicketFront(t) {
                 </div>
             </div>
 
-            <!-- Details Grid -->
             <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap:10px; margin-top:10px;">
                 <div style="background:rgba(255,255,255,0.05); padding:5px; border-radius:6px;">
                     <div style="font-size:8px; color:#aaa;">DATE</div>
@@ -246,23 +294,19 @@ function createTicketFront(t) {
             </div>
         </div>
 
-        <!-- RIGHT SIDE (Stub & QR) -->
         <div style="width: 28%; background: #151515; position: relative; display:flex; flex-direction:column; 
             align-items:center; justify-content:center; z-index: 5;">
             
-            <!-- Repeating Watermark continues here too -->
             <div style="position:absolute; inset:0; background-image: url('${watermarkSVG}'); opacity:0.5; pointer-events:none;"></div>
 
             <div style="font-size:12px; font-weight:900; color:#fff; letter-spacing:1px; margin-bottom:8px; z-index:2;">SCAN ME</div>
             
-            <!-- QR Code Box (High Contrast) -->
             <div style="background:white; padding:4px; border-radius:6px; z-index:2;">
                 <div id="qr-${t.ticketId}"></div>
             </div>
             
             <div style="font-family:monospace; font-size:10px; color:#666; font-weight:bold; margin-top:6px; z-index:2;">${t.ticketId}</div>
 
-            <!-- Cutout Notches (Visual) -->
             <div style="position:absolute; top:-10px; left:-10px; width:20px; height:20px; background:#0f1015; border-radius:50%; z-index:10;"></div>
             <div style="position:absolute; bottom:-10px; left:-10px; width:20px; height:20px; background:#0f1015; border-radius:50%; z-index:10;"></div>
         </div>
@@ -276,7 +320,6 @@ function createTicketBack(t) {
         display: flex; align-items: center; justify-content: center; text-align: center;
         font-family: 'Segoe UI', sans-serif; color: #ccc; border: 1px solid #333;">
         
-        <!-- FULL WATERMARK BACKGROUND -->
         <div style="position:absolute; inset:0; background-image: url('${watermarkSVG}'); opacity:0.15;"></div>
 
         <div style="z-index:2; width:85%;">
@@ -294,96 +337,163 @@ function createTicketBack(t) {
     </div>`;
 }
 
-// 8. DOWNLOADS (Dual ZIP Fixed)
+// ================================================
+// 8. DOWNLOADS (Dual ZIP + PDF) — FIXED
+// ================================================
 async function downloadZip() {
     if(!allTickets.length) return;
     const btn = document.getElementById('downloadZipBtn');
-    btn.disabled = true; btn.innerHTML = 'Creating Zip...';
-    const canvas = document.getElementById('ticketCanvas');
+    const canvasWrapper = document.getElementById('ticketCanvas');
+    if (!canvasWrapper) {
+        alert('ticketCanvas container not found.');
+        return;
+    }
+
+    btn.disabled = true;
+    btn.innerHTML = 'Creating Zip...';
 
     try {
         const zip = new JSZip();
         const folder = zip.folder("Tickets_Front_Back");
-        // Limit to 50 for safety, increase if needed
-        const count = Math.min(allTickets.length, 100); 
+        const count = Math.min(allTickets.length, 100); // safety limit
 
         for(let i=0; i<count; i++) {
             const t = allTickets[i];
-            
-            // 1. FRONT
-            canvas.innerHTML = createTicketFront(t); 
-            new QRCode(document.getElementById('qr-'+t.ticketId), {
-                text: getTicketLink(t), width: 75, height: 75,
-                colorDark: "#000000", colorLight: "#ffffff",
+
+            // FRONT
+            canvasWrapper.innerHTML = createTicketFront(t);
+            const qrContainerFront = document.getElementById('qr-'+t.ticketId);
+            new QRCode(qrContainerFront, {
+                text: getTicketLink(t),
+                width: 75,
+                height: 75,
+                colorDark: "#000000",
+                colorLight: "#ffffff",
                 correctLevel: QRCode.CorrectLevel.Q
             });
-            await sleep(20);
-            let cvs = await html2canvas(canvas.firstElementChild, {scale: 2});
-            folder.file(`${t.ticketId}_FRONT.png`, cvs.toDataURL('image/png').split(',')[1], {base64: true});
+            await waitForQRCodeRendered(qrContainerFront);
 
-            // 2. BACK
-            canvas.innerHTML = createTicketBack(t);
-            await sleep(10);
-            cvs = await html2canvas(canvas.firstElementChild, {scale: 2});
-            folder.file(`${t.ticketId}_BACK.png`, cvs.toDataURL('image/png').split(',')[1], {base64: true});
-            
-            if(i%10===0) btn.innerHTML = `Zipping ${i}/${count}...`;
+            const elFront = canvasWrapper.firstElementChild;
+            console.log('FRONT size', elFront.offsetWidth, elFront.offsetHeight);
+            const cvsFront = await html2canvas(elFront, { scale: 2, useCORS: true });
+            folder.file(
+                `${t.ticketId}_FRONT.png`,
+                cvsFront.toDataURL('image/png').split(',')[1],
+                { base64: true }
+            );
+
+            // BACK
+            canvasWrapper.innerHTML = createTicketBack(t);
+            const elBack = canvasWrapper.firstElementChild;
+            console.log('BACK size', elBack.offsetWidth, elBack.offsetHeight);
+            const cvsBack = await html2canvas(elBack, { scale: 2, useCORS: true });
+            folder.file(
+                `${t.ticketId}_BACK.png`,
+                cvsBack.toDataURL('image/png').split(',')[1],
+                { base64: true }
+            );
+
+            if(i % 10 === 0) btn.innerHTML = `Zipping ${i}/${count}...`;
         }
-        
-        const content = await zip.generateAsync({type:"blob"});
+
+        const content = await zip.generateAsync({ type:"blob" });
         saveAs(content, "EKINTABULI_All_Tickets.zip");
         showNotification("Zip Downloaded!");
-    } catch(e) { console.error(e); alert("Zip Error"); } 
-    finally { btn.disabled=false; btn.innerHTML='📦 ZIP'; canvas.innerHTML=''; }
+    } catch(e) {
+        console.error(e);
+        alert("Zip Error");
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = '📦 ZIP';
+        canvasWrapper.innerHTML = '';
+    }
 }
 
 async function downloadDoubleSidedPdf() {
     if(!allTickets.length) return;
     const btn = document.getElementById('downloadPdfBtn');
-    btn.disabled=true;
+    const canvasWrapper = document.getElementById('ticketCanvas');
+    if (!canvasWrapper) {
+        alert('ticketCanvas container not found.');
+        return;
+    }
+
+    btn.disabled = true;
     try {
         const { jsPDF } = window.jspdf;
         const doc = new jsPDF('p', 'mm', 'a4');
-        const canvas = document.getElementById('ticketCanvas');
-        const tW=60, tH=24, cols=3, rows=11, perPage=33;
-        
+        const tW = 60, tH = 24, cols = 3, rows = 11, perPage = cols * rows; // 33 tickets per front/back
+
         const chunks = [];
-        for(let i=0; i<allTickets.length; i+=perPage) chunks.push(allTickets.slice(i, i+perPage));
+        for(let i=0; i<allTickets.length; i+=perPage) {
+            chunks.push(allTickets.slice(i, i+perPage));
+        }
 
         for(let p=0; p<chunks.length; p++) {
             const data = chunks[p];
-            // Front
+
+            // FRONT PAGE
             if(p>0) doc.addPage();
             btn.innerHTML = `Page ${p+1} Front...`;
             let x=10, y=10, c=0;
             for(let t of data) {
-                canvas.innerHTML = createTicketFront(t);
-                new QRCode(document.getElementById('qr-'+t.ticketId), { text: getTicketLink(t), width:75, height:75, correctLevel: QRCode.CorrectLevel.Q });
-                await sleep(10);
-                const img = await html2canvas(canvas.firstElementChild, {scale:3});
-                doc.addImage(img.toDataURL('image/png'), 'PNG', x, y, tW, tH);
-                x+=tW+2; c++; if(c%cols===0){x=10; y+=tH+2;}
+                canvasWrapper.innerHTML = createTicketFront(t);
+                const qrContainer = document.getElementById('qr-'+t.ticketId);
+                new QRCode(qrContainer, {
+                    text: getTicketLink(t),
+                    width: 75,
+                    height: 75,
+                    colorDark: "#000000",
+                    colorLight: "#ffffff",
+                    correctLevel: QRCode.CorrectLevel.Q
+                });
+                await waitForQRCodeRendered(qrContainer);
+                const el = canvasWrapper.firstElementChild;
+                const imgCanvas = await html2canvas(el, { scale: 3, useCORS: true });
+                doc.addImage(imgCanvas.toDataURL('image/png'), 'PNG', x, y, tW, tH);
+                x += tW + 2;
+                c++;
+                if(c % cols === 0) { x = 10; y += tH + 2; }
             }
-            // Back
+
+            // BACK PAGE
             doc.addPage();
             btn.innerHTML = `Page ${p+1} Back...`;
             x=10; y=10; c=0;
             for(let t of data) {
-                canvas.innerHTML = createTicketBack(t);
-                await sleep(10);
-                const img = await html2canvas(canvas.firstElementChild, {scale:3});
-                doc.addImage(img.toDataURL('image/png'), 'PNG', x, y, tW, tH);
-                x+=tW+2; c++; if(c%cols===0){x=10; y+=tH+2;}
+                canvasWrapper.innerHTML = createTicketBack(t);
+                const el = canvasWrapper.firstElementChild;
+                const imgCanvas = await html2canvas(el, { scale: 3, useCORS: true });
+                doc.addImage(imgCanvas.toDataURL('image/png'), 'PNG', x, y, tW, tH);
+                x += tW + 2;
+                c++;
+                if(c % cols === 0) { x = 10; y += tH + 2; }
             }
         }
+
         doc.save('Tickets.pdf');
         showNotification("PDF Ready");
-    } catch(e){console.error(e);} finally{btn.disabled=false; btn.innerHTML='📄 PDF (A4)'; canvas.innerHTML='';}
+    } catch(e) {
+        console.error(e);
+        alert('PDF Error');
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = '📄 PDF (A4)';
+        if (canvasWrapper) canvasWrapper.innerHTML='';
+    }
 }
 
+// ================================================
+// 9. CSV EXPORT, TABLE & PREVIEW
+// ================================================
 function exportCSV() {
     const rows = [["Ticket ID", "Status", "Price", "Created At"]];
-    allTickets.forEach(t => rows.push([t.ticketId, t.status, t.price, t.createdAt?.seconds ? new Date(t.createdAt.seconds*1000).toISOString() : '']));
+    allTickets.forEach(t => rows.push([
+        t.ticketId,
+        t.status,
+        t.price,
+        t.createdAt?.seconds ? new Date(t.createdAt.seconds*1000).toISOString() : ''
+    ]));
     const csvContent = "data:text/csv;charset=utf-8," + rows.map(e => e.join(",")).join("\n");
     const link = document.createElement("a");
     link.href = encodeURI(csvContent);
@@ -391,27 +501,33 @@ function exportCSV() {
     link.click();
 }
 
-// 9. TABLE & PREVIEW (Filter Fixed)
 function renderTable() {
     const tbody = document.getElementById('ticketTableBody');
-    const searchVal = document.getElementById('searchTicket').value.toUpperCase();
-    const filterVal = document.getElementById('filterStatus').value;
+    const searchInput = document.getElementById('searchTicket');
+    const filterSelect = document.getElementById('filterStatus');
+    const pagination = document.getElementById('pagination');
 
-    // Filtering Logic (Calculated here to update UI instantly)
+    if (!tbody) return;
+
+    const searchVal = (searchInput?.value || '').toUpperCase();
+    const filterVal = filterSelect?.value || 'ALL';
+
     filteredTickets = allTickets.filter(t => {
-        const matchesSearch = t.ticketId.includes(searchVal);
+        const matchesSearch = t.ticketId.toUpperCase().includes(searchVal);
         const matchesStatus = filterVal === "ALL" || t.status === filterVal;
         return matchesSearch && matchesStatus;
     });
 
-    const totalPages = Math.ceil(filteredTickets.length / 20);
-    const start = (currentPage-1)*20;
+    const totalPages = Math.max(1, Math.ceil(filteredTickets.length / 20));
+    if (currentPage > totalPages) currentPage = totalPages;
+
+    const start = (currentPage-1) * 20;
     const pageData = filteredTickets.slice(start, start+20);
-    
-    if(!pageData.length) { 
-        tbody.innerHTML = '<tr><td colspan="4" style="text-align:center; padding:20px;">No tickets match your search.</td></tr>'; 
-        document.getElementById('pagination').innerHTML = '';
-        return; 
+
+    if(!pageData.length) {
+        tbody.innerHTML = '<tr><td colspan="4" style="text-align:center; padding:20px;">No tickets match your search.</td></tr>';
+        if (pagination) pagination.innerHTML = '';
+        return;
     }
 
     tbody.innerHTML = pageData.map(t => `
@@ -426,28 +542,45 @@ function renderTable() {
             <td><button class="btn-secondary" onclick="showPreview('${t.ticketId}')">View</button></td>
         </tr>
     `).join('');
-    
-    let pagHTML = '';
-    if(currentPage > 1) pagHTML += `<button onclick="changePage(-1)">Prev</button>`;
-    pagHTML += `<span>Page ${currentPage} of ${totalPages || 1}</span>`;
-    if(currentPage < totalPages) pagHTML += `<button onclick="changePage(1)">Next</button>`;
-    document.getElementById('pagination').innerHTML = pagHTML;
+
+    if (pagination) {
+        let pagHTML = '';
+        if(currentPage > 1) pagHTML += `<button onclick="changePage(-1)">Prev</button>`;
+        pagHTML += `<span>Page ${currentPage} of ${totalPages}</span>`;
+        if(currentPage < totalPages) pagHTML += `<button onclick="changePage(1)">Next</button>`;
+        pagination.innerHTML = pagHTML;
+    }
 }
 
-function changePage(dir) { currentPage += dir; renderTable(); }
+function changePage(dir) {
+    currentPage += dir;
+    renderTable();
+}
 
 function showPreview(tid) {
     if(typeof tid !== 'string') return;
     const t = allTickets.find(x => x.ticketId === tid);
+    if (!t) return;
+
     const modal = document.getElementById('ticketPreviewModal');
-    document.getElementById('ticketFrontPreview').innerHTML = createTicketFront(t);
-    document.getElementById('ticketBackPreview').innerHTML = createTicketBack(t);
-    modal.classList.add('active');
+    const frontDiv = document.getElementById('ticketFrontPreview');
+    const backDiv = document.getElementById('ticketBackPreview');
+
+    if (frontDiv) frontDiv.innerHTML = createTicketFront(t);
+    if (backDiv) backDiv.innerHTML = createTicketBack(t);
+    if (modal) modal.classList.add('active');
+
     setTimeout(() => {
-        new QRCode(document.getElementById('qr-'+t.ticketId), {
-            text: getTicketLink(t), width: 75, height: 75,
-            colorDark: "#000000", colorLight: "#ffffff",
-            correctLevel: QRCode.CorrectLevel.Q
-        });
+        const qrContainer = document.getElementById('qr-'+t.ticketId);
+        if (qrContainer) {
+            new QRCode(qrContainer, {
+                text: getTicketLink(t),
+                width: 75,
+                height: 75,
+                colorDark: "#000000",
+                colorLight: "#ffffff",
+                correctLevel: QRCode.CorrectLevel.Q
+            });
+        }
     }, 100);
 }
