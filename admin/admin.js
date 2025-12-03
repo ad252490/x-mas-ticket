@@ -62,21 +62,23 @@ function formatTimestamp(timestamp) {
 }
 
 function getVerifyUrl() {
-    // YOUR PRODUCTION URL - CHANGE THIS TO YOUR ACTUAL DEPLOYED URL
+    // YOUR PRODUCTION URL
     var productionUrl = 'https://ad252490.github.io/x-mas-ticket/verify/index.html';
-    
-    // Always use production URL for QR codes
     return productionUrl;
+}
+
+function getTicketLink(ticket) {
+    return getVerifyUrl() + '?t=' + encodeURIComponent(ticket.encryptedCode);
 }
 
 function showNotification(message, type) {
     type = type || 'success';
     var container = document.getElementById('notificationContainer');
-    if (! container) return;
+    if (!container) return;
     var icon = type === 'success' ? '✅' : type === 'error' ? '❌' : '⚠️';
     var notification = document.createElement('div');
     notification.className = 'notification ' + type;
-    notification. innerHTML = '<span>' + icon + '</span><span>' + message + '</span>';
+    notification.innerHTML = '<span>' + icon + '</span><span>' + message + '</span>';
     container.appendChild(notification);
     setTimeout(function() {
         notification.style.opacity = '0';
@@ -112,17 +114,17 @@ function generateChecksum(str) {
     for (var i = 0; i < str.length; i++) {
         sum += str.charCodeAt(i) * (i + 1);
     }
-    return (sum % 36). toString(36). toUpperCase();
+    return (sum % 36).toString(36).toUpperCase();
 }
 
 function encryptTicketCode(ticketId) {
-    var timestamp = Date.now(). toString(36);
+    var timestamp = Date.now().toString(36);
     var random = generateRandomString(8);
     var combined = ticketId + '|' + CONFIG.secretKey + '|' + timestamp + '|' + random;
     var encrypted = btoa(combined);
     // Add integrity hash
     var hash = simpleHash(encrypted);
-    return encrypted. replace(/[=+/]/g, '') + hash;
+    return encrypted.replace(/[=+/]/g, '') + hash;
 }
 
 function simpleHash(str) {
@@ -132,14 +134,14 @@ function simpleHash(str) {
         hash = ((hash << 5) - hash) + char;
         hash = hash & hash;
     }
-    return Math.abs(hash). toString(36). substring(0, 4). toUpperCase();
+    return Math.abs(hash).toString(36).substring(0, 4).toUpperCase();
 }
 
 // ================================================
 // INITIALIZATION
 // ================================================
 document.addEventListener('DOMContentLoaded', function() {
-    console.log('Initializing EKINTABULI Admin Dashboard.. .');
+    console.log('Initializing EKINTABULI Admin Dashboard...');
     checkFirebaseConnection();
     setupEventListeners();
     loadTickets();
@@ -162,7 +164,7 @@ function checkFirebaseConnection() {
                 console.log('Firebase connected');
                 setupFirebaseListeners();
             })
-            . catch(function(error) {
+            .catch(function(error) {
                 console.warn('Firebase read failed:', error);
                 setLocalMode(statusEl, textEl, dotEl);
             });
@@ -182,11 +184,11 @@ function setLocalMode(statusEl, textEl, dotEl) {
 function setupFirebaseListeners() {
     if (!isFirebaseConnected || !db) return;
     
-    db.collection('tickets'). orderBy('createdAt', 'desc').onSnapshot(function(snapshot) {
+    db.collection('tickets').orderBy('createdAt', 'desc').onSnapshot(function(snapshot) {
         allTickets = [];
         snapshot.forEach(function(doc) {
             var data = doc.data();
-            data.id = doc. id;
+            data.id = doc.id;
             allTickets.push(data);
         });
         updateDashboard();
@@ -205,7 +207,7 @@ function setupEventListeners() {
             if (confirm('Are you sure you want to logout?')) {
                 sessionStorage.removeItem('ekintabuli_auth');
                 localStorage.removeItem('ekintabuli_auth');
-                window. location.href = '../index.html';
+                window.location.href = '../index.html';
             }
         });
     }
@@ -215,7 +217,13 @@ function setupEventListeners() {
         generateBtn.addEventListener('click', generateAllTickets);
     }
     
-    var downloadZipBtn = document. getElementById('downloadZipBtn');
+    // NEW LISTENER FOR CLEAR BUTTON
+    var clearDbBtn = document.getElementById('clearDbBtn');
+    if (clearDbBtn) {
+        clearDbBtn.addEventListener('click', clearDatabase);
+    }
+    
+    var downloadZipBtn = document.getElementById('downloadZipBtn');
     if (downloadZipBtn) {
         downloadZipBtn.addEventListener('click', downloadAsZip);
     }
@@ -225,7 +233,7 @@ function setupEventListeners() {
         downloadPdfBtn.addEventListener('click', downloadAsPdf);
     }
     
-    var previewBtn = document. getElementById('previewBtn');
+    var previewBtn = document.getElementById('previewBtn');
     if (previewBtn) {
         previewBtn.addEventListener('click', showPreview);
     }
@@ -236,7 +244,7 @@ function setupEventListeners() {
             loadTickets();
             updateDashboard();
             renderTicketTable();
-            showNotification('Tickets refreshed! ', 'success');
+            showNotification('Tickets refreshed!', 'success');
         });
     }
     
@@ -263,7 +271,7 @@ function setupEventListeners() {
     
     var closeModalBtn = document.getElementById('closeModalBtn');
     if (closeModalBtn) {
-        closeModalBtn. addEventListener('click', closeModal);
+        closeModalBtn.addEventListener('click', closeModal);
     }
     
     var modal = document.getElementById('ticketPreviewModal');
@@ -275,6 +283,75 @@ function setupEventListeners() {
 }
 
 // ================================================
+// NEW: CLEAR DATABASE FUNCTION
+// ================================================
+async function clearDatabase() {
+    if (!confirm('⚠️ CRITICAL WARNING ⚠️\n\nThis will PERMANENTLY DELETE all tickets from the database and local storage.\n\nExisting QR codes will STOP WORKING.\n\nAre you sure you want to proceed?')) {
+        return;
+    }
+
+    var btn = document.getElementById('clearDbBtn');
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = 'Clearing...';
+    }
+
+    try {
+        // 1. Clear Local Storage
+        localStorage.removeItem('ekintabuli_tickets');
+        allTickets = [];
+        generatedTicketsData = [];
+        
+        // 2. Clear Firebase (if connected)
+        if (isFirebaseConnected && db) {
+            showNotification('Clearing cloud database...', 'warning');
+            
+            // Get all documents in 'tickets' collection
+            var snapshot = await db.collection('tickets').get();
+            
+            if (snapshot.size > 0) {
+                // Delete in batches of 400 (Firestore limit is 500)
+                var batch = db.batch();
+                var count = 0;
+                var totalDeleted = 0;
+
+                for (var i = 0; i < snapshot.docs.length; i++) {
+                    batch.delete(snapshot.docs[i].ref);
+                    count++;
+                    
+                    if (count >= 400) {
+                        await batch.commit();
+                        batch = db.batch();
+                        totalDeleted += count;
+                        console.log('Deleted batch of ' + count);
+                        count = 0;
+                    }
+                }
+                
+                if (count > 0) {
+                    await batch.commit();
+                    totalDeleted += count;
+                }
+                console.log('Total deleted from cloud: ' + totalDeleted);
+            }
+        }
+
+        showNotification('Database cleared successfully!', 'success');
+        updateDashboard();
+        renderTicketTable();
+
+    } catch (error) {
+        console.error('Clear error:', error);
+        showNotification('Error clearing database: ' + error.message, 'error');
+    } finally {
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = '🗑️ Clear Database';
+        }
+    }
+}
+
+// ================================================
 // LOCAL STORAGE
 // ================================================
 function saveTickets() {
@@ -282,11 +359,11 @@ function saveTickets() {
 }
 
 function loadTickets() {
-    var saved = localStorage. getItem('ekintabuli_tickets');
+    var saved = localStorage.getItem('ekintabuli_tickets');
     if (saved) {
         try {
             allTickets = JSON.parse(saved);
-            console.log('Loaded ' + allTickets. length + ' tickets from local storage');
+            console.log('Loaded ' + allTickets.length + ' tickets from local storage');
         } catch (e) {
             console.error('Error loading tickets:', e);
             allTickets = [];
@@ -311,18 +388,18 @@ function updateDashboard() {
     document.getElementById('statGenerated').textContent = stats.generated;
     document.getElementById('statDownloaded').textContent = stats.downloaded;
     document.getElementById('statSold').textContent = stats.sold;
-    document.getElementById('statUsed'). textContent = stats. used;
+    document.getElementById('statUsed').textContent = stats.used;
     document.getElementById('statRevenue').textContent = formatCurrency(stats.revenue);
     
     var ticketCount = parseInt(document.getElementById('ticketCount').value) || 400;
     var ticketPrice = parseInt(document.getElementById('ticketPrice').value) || CONFIG.ticketPrice;
     var totalPotential = ticketCount * ticketPrice;
     var soldRevenue = stats.sold * ticketPrice;
-    var attendancePercent = stats.sold > 0 ?  Math.round((stats. used / stats.sold) * 100) : 0;
+    var attendancePercent = stats.sold > 0 ? Math.round((stats.used / stats.sold) * 100) : 0;
     
     document.getElementById('totalPotential').textContent = ticketCount + ' x ' + formatCurrency(ticketPrice) + ' = ' + formatCurrency(totalPotential) + ' UGX';
     document.getElementById('soldRevenue').textContent = stats.sold + ' x ' + formatCurrency(ticketPrice) + ' = ' + formatCurrency(soldRevenue) + ' UGX';
-    document. getElementById('attendanceRate').textContent = stats.used + ' / ' + stats.sold + ' (' + attendancePercent + '%)';
+    document.getElementById('attendanceRate').textContent = stats.used + ' / ' + stats.sold + ' (' + attendancePercent + '%)';
     document.getElementById('expectedCollection').textContent = formatCurrency(soldRevenue) + ' UGX';
 }
 
@@ -334,18 +411,18 @@ function renderTicketTable() {
     var searchTerm = (document.getElementById('searchTicket').value || '').toLowerCase();
     var filterStatus = document.getElementById('filterStatus').value;
     
-    var filteredTickets = allTickets. filter(function(ticket) {
-        var matchesSearch = ticket. ticketId.toLowerCase(). indexOf(searchTerm) !== -1;
+    var filteredTickets = allTickets.filter(function(ticket) {
+        var matchesSearch = ticket.ticketId.toLowerCase().indexOf(searchTerm) !== -1;
         var matchesStatus = filterStatus === 'all' || ticket.status === filterStatus;
         return matchesSearch && matchesStatus;
     });
     
-    var totalPages = Math.ceil(filteredTickets. length / ticketsPerPage);
+    var totalPages = Math.ceil(filteredTickets.length / ticketsPerPage);
     var startIdx = (currentPage - 1) * ticketsPerPage;
     var pageTickets = filteredTickets.slice(startIdx, startIdx + ticketsPerPage);
     
-    if (pageTickets. length === 0) {
-        tbody. innerHTML = '<tr><td colspan="4" class="empty-state"><div class="empty-icon">🎫</div><p>No tickets found</p></td></tr>';
+    if (pageTickets.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="4" class="empty-state"><div class="empty-icon">🎫</div><p>No tickets found</p></td></tr>';
         document.getElementById('pagination').innerHTML = '';
         return;
     }
@@ -353,11 +430,11 @@ function renderTicketTable() {
     var html = '';
     for (var i = 0; i < pageTickets.length; i++) {
         var ticket = pageTickets[i];
-        var statusClass = 'status-' + ticket.status. toLowerCase();
+        var statusClass = 'status-' + ticket.status.toLowerCase();
         html += '<tr>' +
-            '<td><code style="background:rgba(212,175,55,0. 1);padding:5px 10px;border-radius:5px;font-size:12px;">' + ticket.ticketId + '</code></td>' +
-            '<td><span class="status-badge ' + statusClass + '">' + ticket. status + '</span></td>' +
-            '<td>' + formatTimestamp(ticket. createdAt) + '</td>' +
+            '<td><code style="background:rgba(212,175,55,0.1);padding:5px 10px;border-radius:5px;font-size:12px;">' + ticket.ticketId + '</code></td>' +
+            '<td><span class="status-badge ' + statusClass + '">' + ticket.status + '</span></td>' +
+            '<td>' + formatTimestamp(ticket.createdAt) + '</td>' +
             '<td>' +
                 '<button class="btn btn-small btn-secondary" onclick="viewTicket(\'' + ticket.ticketId + '\')">👁️</button>' +
                 '<button class="btn btn-small btn-primary" onclick="markTicketAsSold(\'' + ticket.ticketId + '\')">💰</button>' +
@@ -419,9 +496,9 @@ function renderScanLogs(snapshot) {
     }
     
     document.getElementById('totalScans').textContent = totalScans;
-    document.getElementById('validScans'). textContent = validScans;
+    document.getElementById('validScans').textContent = validScans;
     document.getElementById('invalidScans').textContent = invalidScans;
-    document.getElementById('duplicateScans'). textContent = duplicateScans;
+    document.getElementById('duplicateScans').textContent = duplicateScans;
     container.innerHTML = logsHtml || '<div class="empty-state"><p>No scans recorded yet</p></div>';
 }
 
@@ -429,7 +506,7 @@ function renderScanLogs(snapshot) {
 // TICKET GENERATION
 // ================================================
 async function generateAllTickets() {
-    var ticketCount = parseInt(document. getElementById('ticketCount').value) || 400;
+    var ticketCount = parseInt(document.getElementById('ticketCount').value) || 400;
     var btn = document.getElementById('generateBtn');
     var progressContainer = document.getElementById('progressContainer');
     var progressFill = document.getElementById('progressFill');
@@ -437,7 +514,7 @@ async function generateAllTickets() {
     var badge = document.getElementById('ticketBadge');
     
     if (allTickets.length > 0) {
-        if (! confirm('You have ' + allTickets.length + ' tickets.  Generate ' + ticketCount + ' new tickets?  This will replace existing. ')) {
+        if (!confirm('You have ' + allTickets.length + ' tickets. Generate ' + ticketCount + ' new tickets? This will replace existing.')) {
             return;
         }
     }
@@ -445,7 +522,7 @@ async function generateAllTickets() {
     btn.disabled = true;
     btn.innerHTML = 'Generating...';
     badge.textContent = 'Generating';
-    progressContainer. style.display = 'block';
+    progressContainer.style.display = 'block';
     
     allTickets = [];
     generatedTicketsData = [];
@@ -454,6 +531,8 @@ async function generateAllTickets() {
         for (var i = 1; i <= ticketCount; i++) {
             var ticketId = generateSecureTicketId(i);
             var encryptedCode = encryptTicketCode(ticketId);
+            
+            // We generate the URL here for storage, but we use getTicketLink() for display to be safe
             var verifyUrl = getVerifyUrl() + '?t=' + encodeURIComponent(encryptedCode);
             
             var ticketData = {
@@ -467,11 +546,11 @@ async function generateAllTickets() {
                 price: CONFIG.ticketPrice,
                 encryptedCode: encryptedCode,
                 verifyUrl: verifyUrl,
-                securityHash: simpleHash(ticketId + CONFIG. secretKey)
+                securityHash: simpleHash(ticketId + CONFIG.secretKey)
             };
             
             allTickets.push(ticketData);
-            generatedTicketsData. push(ticketData);
+            generatedTicketsData.push(ticketData);
             
             var percent = Math.round((i / ticketCount) * 100);
             progressFill.style.width = percent + '%';
@@ -487,10 +566,10 @@ async function generateAllTickets() {
         if (isFirebaseConnected && db) {
             try {
                 await saveTicketsToFirebase();
-                progressText.textContent = 'Generated ' + ticketCount + ' tickets (synced to cloud)! ';
+                progressText.textContent = 'Generated ' + ticketCount + ' tickets (synced to cloud)!';
             } catch (e) {
                 console.warn('Firebase save failed:', e);
-                progressText. textContent = 'Generated ' + ticketCount + ' tickets (saved locally)!';
+                progressText.textContent = 'Generated ' + ticketCount + ' tickets (saved locally)!';
             }
         } else {
             progressText.textContent = 'Generated ' + ticketCount + ' tickets (saved locally)!';
@@ -503,7 +582,7 @@ async function generateAllTickets() {
         var pdfBtn = document.getElementById('downloadPdfBtn');
         if (pdfBtn) pdfBtn.disabled = false;
         
-        showNotification('Successfully generated ' + ticketCount + ' tickets! ', 'success');
+        showNotification('Successfully generated ' + ticketCount + ' tickets!', 'success');
         updateDashboard();
         renderTicketTable();
         
@@ -519,16 +598,16 @@ async function generateAllTickets() {
 }
 
 async function saveTicketsToFirebase() {
-    if (! db) return;
+    if (!db) return;
     var batchSize = 400;
     for (var i = 0; i < allTickets.length; i += batchSize) {
         var batch = db.batch();
-        var chunk = allTickets. slice(i, i + batchSize);
+        var chunk = allTickets.slice(i, i + batchSize);
         for (var j = 0; j < chunk.length; j++) {
             var ticket = chunk[j];
             var docRef = db.collection('tickets').doc(ticket.ticketId);
             var ticketCopy = Object.assign({}, ticket);
-            ticketCopy.createdAt = firebase.firestore. FieldValue.serverTimestamp();
+            ticketCopy.createdAt = firebase.firestore.FieldValue.serverTimestamp();
             batch.set(docRef, ticketCopy);
         }
         await batch.commit();
@@ -553,21 +632,21 @@ window.viewTicket = function(ticketId) {
     }
 };
 
-window. markTicketAsSold = function(ticketId) {
+window.markTicketAsSold = function(ticketId) {
     for (var i = 0; i < allTickets.length; i++) {
         if (allTickets[i].ticketId === ticketId) {
-            allTickets[i]. status = 'SOLD';
-            allTickets[i]. soldAt = new Date().toISOString();
+            allTickets[i].status = 'SOLD';
+            allTickets[i].soldAt = new Date().toISOString();
             saveTickets();
             updateDashboard();
             renderTicketTable();
-            showNotification('Ticket ' + ticketId + ' marked as sold! ', 'success');
+            showNotification('Ticket ' + ticketId + ' marked as sold!', 'success');
             
             if (isFirebaseConnected && db) {
-                db.collection('tickets'). doc(ticketId).update({
+                db.collection('tickets').doc(ticketId).update({
                     status: 'SOLD',
-                    soldAt: firebase.firestore. FieldValue.serverTimestamp()
-                }). catch(function(e) { console.warn('Firebase update failed:', e); });
+                    soldAt: firebase.firestore.FieldValue.serverTimestamp()
+                }).catch(function(e) { console.warn('Firebase update failed:', e); });
             }
             break;
         }
@@ -578,8 +657,8 @@ window. markTicketAsSold = function(ticketId) {
 // TICKET PREVIEW
 // ================================================
 function showPreview() {
-    if (allTickets. length === 0) {
-        showNotification('Generate tickets first! ', 'warning');
+    if (allTickets.length === 0) {
+        showNotification('Generate tickets first!', 'warning');
         return;
     }
     showTicketPreview(allTickets[0]);
@@ -588,7 +667,7 @@ function showPreview() {
 function showTicketPreview(ticket) {
     var modal = document.getElementById('ticketPreviewModal');
     var frontContainer = document.getElementById('ticketFrontPreview');
-    var backContainer = document. getElementById('ticketBackPreview');
+    var backContainer = document.getElementById('ticketBackPreview');
     
     frontContainer.innerHTML = createTicketFrontHTML(ticket);
     backContainer.innerHTML = createTicketBackHTML(ticket);
@@ -600,28 +679,28 @@ function showTicketPreview(ticket) {
         if (qrContainer && typeof QRCode !== 'undefined') {
             qrContainer.innerHTML = '';
             new QRCode(qrContainer, {
-                text: ticket.verifyUrl,
+                text: getTicketLink(ticket), // UPDATED: Uses dynamic link
                 width: 80,
                 height: 80,
                 colorDark: '#1a1a2e',
                 colorLight: '#ffffff',
-                correctLevel: QRCode. CorrectLevel.H
+                correctLevel: QRCode.CorrectLevel.H
             });
         }
     }, 100);
 }
 
 function closeModal() {
-    var modal = document. getElementById('ticketPreviewModal');
+    var modal = document.getElementById('ticketPreviewModal');
     modal.classList.remove('active');
 }
 
 // ================================================
-// PROFESSIONAL TICKET DESIGN - FRONT (5. 5cm x 2cm)
+// PROFESSIONAL TICKET DESIGN - FRONT (5.5cm x 2cm)
 // ================================================
 function createTicketFrontHTML(ticket) {
     var w = CONFIG.ticketWidth;
-    var h = CONFIG. ticketHeight;
+    var h = CONFIG.ticketHeight;
     
     return '<div class="ticket-front" style="' +
         'width:' + w + 'px;' +
@@ -637,7 +716,7 @@ function createTicketFrontHTML(ticket) {
         
         // Security pattern watermark
         '<div style="position:absolute;top:0;left:0;right:0;bottom:0;' +
-        'background:repeating-linear-gradient(45deg,transparent,transparent 10px,rgba(212,175,55,0.03) 10px,rgba(212,175,55,0. 03) 20px);' +
+        'background:repeating-linear-gradient(45deg,transparent,transparent 10px,rgba(212,175,55,0.03) 10px,rgba(212,175,55,0.03) 20px);' +
         'pointer-events:none;"></div>' +
         
         // Diagonal watermark text
@@ -653,7 +732,7 @@ function createTicketFrontHTML(ticket) {
         
         // Gold border
         '<div style="position:absolute;top:4px;left:4px;right:4px;bottom:4px;' +
-        'border:1. 5px solid rgba(212,175,55,0.5);border-radius:10px;pointer-events:none;"></div>' +
+        'border:1.5px solid rgba(212,175,55,0.5);border-radius:10px;pointer-events:none;"></div>' +
         
         // Left section - Event info
         '<div style="position:absolute;left:12px;top:12px;bottom:12px;width:55%;">' +
@@ -682,7 +761,7 @@ function createTicketFrontHTML(ticket) {
             
             // Ticket ID and Price
             '<div style="display:flex;justify-content:space-between;padding:6px 8px;' +
-            'background:rgba(212,175,55,0. 15);border-radius:6px;border:1px solid rgba(212,175,55,0.3);">' +
+            'background:rgba(212,175,55,0.15);border-radius:6px;border:1px solid rgba(212,175,55,0.3);">' +
                 '<div>' +
                     '<div style="font-size:5px;color:#888;">TICKET ID</div>' +
                     '<div style="font-size:7px;font-weight:700;color:#D4AF37;">' + ticket.ticketId + '</div>' +
@@ -736,13 +815,13 @@ function createTicketBackHTML(ticket) {
         
         // Security grid pattern
         '<div style="position:absolute;top:0;left:0;right:0;bottom:0;' +
-        'background:repeating-linear-gradient(0deg,transparent,transparent 8px,rgba(212,175,55,0.02) 8px,rgba(212,175,55,0. 02) 9px),' +
+        'background:repeating-linear-gradient(0deg,transparent,transparent 8px,rgba(212,175,55,0.02) 8px,rgba(212,175,55,0.02) 9px),' +
         'repeating-linear-gradient(90deg,transparent,transparent 8px,rgba(212,175,55,0.02) 8px,rgba(212,175,55,0.02) 9px);' +
         'pointer-events:none;"></div>' +
         
         // Border
         '<div style="position:absolute;top:4px;left:4px;right:4px;bottom:4px;' +
-        'border:1. 5px solid rgba(212,175,55,0.5);border-radius:10px;pointer-events:none;"></div>' +
+        'border:1.5px solid rgba(212,175,55,0.5);border-radius:10px;pointer-events:none;"></div>' +
         
         // Header
         '<div style="text-align:center;margin-bottom:8px;position:relative;z-index:1;">' +
@@ -750,10 +829,10 @@ function createTicketBackHTML(ticket) {
         '</div>' +
         
         // Terms in columns
-        '<div style="display:flex;gap:10px;font-size:5px;line-height:1. 4;color:#ccc;position:relative;z-index:1;">' +
+        '<div style="display:flex;gap:10px;font-size:5px;line-height:1.4;color:#ccc;position:relative;z-index:1;">' +
             '<div style="flex:1;">' +
                 '<div style="margin-bottom:4px;"><strong style="color:#D4AF37;">1.</strong> Single use only - one scan per entry</div>' +
-                '<div style="margin-bottom:4px;"><strong style="color:#D4AF37;">2. </strong> Non-transferable after scanning</div>' +
+                '<div style="margin-bottom:4px;"><strong style="color:#D4AF37;">2.</strong> Non-transferable after scanning</div>' +
                 '<div><strong style="color:#D4AF37;">3.</strong> Present valid ID if requested</div>' +
             '</div>' +
             '<div style="flex:1;">' +
@@ -785,16 +864,16 @@ function createTicketBackHTML(ticket) {
 // ================================================
 async function downloadAsZip() {
     if (allTickets.length === 0) {
-        showNotification('No tickets to download! ', 'error');
+        showNotification('No tickets to download!', 'error');
         return;
     }
     
     var btn = document.getElementById('downloadZipBtn');
     btn.disabled = true;
-    btn.innerHTML = 'Preparing... ';
+    btn.innerHTML = 'Preparing...';
     
-    var ticketCount = Math.min(allTickets. length, 50);
-    showNotification('Generating ' + ticketCount + ' tickets...  This may take a moment.', 'warning');
+    var ticketCount = Math.min(allTickets.length, 50);
+    showNotification('Generating ' + ticketCount + ' tickets... This may take a moment.', 'warning');
     
     try {
         var zip = new JSZip();
@@ -806,10 +885,10 @@ async function downloadAsZip() {
             
             // Front
             canvas.innerHTML = createTicketFrontHTML(ticket);
-            var qrContainer = document. getElementById('qr-' + ticket.ticketId);
+            var qrContainer = document.getElementById('qr-' + ticket.ticketId);
             if (qrContainer && typeof QRCode !== 'undefined') {
                 new QRCode(qrContainer, {
-                    text: ticket.verifyUrl,
+                    text: getTicketLink(ticket), // UPDATED: Uses dynamic link
                     width: 80,
                     height: 80,
                     colorDark: '#1a1a2e',
@@ -818,8 +897,8 @@ async function downloadAsZip() {
             }
             await sleep(50);
             
-            var frontCanvas = await html2canvas(canvas. firstChild, { scale: CONFIG.printScale, useCORS: true, backgroundColor: null });
-            var frontData = frontCanvas.toDataURL('image/png'). split(',')[1];
+            var frontCanvas = await html2canvas(canvas.firstChild, { scale: CONFIG.printScale, useCORS: true, backgroundColor: null });
+            var frontData = frontCanvas.toDataURL('image/png').split(',')[1];
             ticketsFolder.file(ticket.ticketId + '_FRONT.png', frontData, { base64: true });
             
             // Back
@@ -827,8 +906,8 @@ async function downloadAsZip() {
             await sleep(30);
             
             var backCanvas = await html2canvas(canvas.firstChild, { scale: CONFIG.printScale, useCORS: true, backgroundColor: null });
-            var backData = backCanvas.toDataURL('image/png'). split(',')[1];
-            ticketsFolder.file(ticket. ticketId + '_BACK.png', backData, { base64: true });
+            var backData = backCanvas.toDataURL('image/png').split(',')[1];
+            ticketsFolder.file(ticket.ticketId + '_BACK.png', backData, { base64: true });
             
             btn.innerHTML = (i + 1) + '/' + ticketCount;
         }
@@ -850,22 +929,22 @@ async function downloadAsZip() {
 // DOWNLOAD AS PDF (Both Sides)
 // ================================================
 async function downloadAsPdf() {
-    if (allTickets. length === 0) {
+    if (allTickets.length === 0) {
         showNotification('No tickets to download!', 'error');
         return;
     }
     
     if (typeof jspdf === 'undefined' && typeof jsPDF === 'undefined') {
-        showNotification('PDF library not loaded.  Use ZIP download instead.', 'error');
+        showNotification('PDF library not loaded. Use ZIP download instead.', 'error');
         return;
     }
     
     var btn = document.getElementById('downloadPdfBtn');
-    btn. disabled = true;
+    btn.disabled = true;
     btn.innerHTML = 'Creating PDF...';
     
     try {
-        var PDF = window.jspdf ?  window.jspdf. jsPDF : window.jsPDF;
+        var PDF = window.jspdf ? window.jspdf.jsPDF : window.jsPDF;
         var doc = new PDF({ orientation: 'landscape', unit: 'cm', format: [5.5, 2] });
         var canvas = document.getElementById('ticketCanvas');
         var ticketCount = Math.min(allTickets.length, 20);
@@ -873,16 +952,22 @@ async function downloadAsPdf() {
         for (var i = 0; i < ticketCount; i++) {
             var ticket = allTickets[i];
             
-            if (i > 0) doc. addPage([5.5, 2], 'landscape');
+            if (i > 0) doc.addPage([5.5, 2], 'landscape');
             
             // Front
-            canvas. innerHTML = createTicketFrontHTML(ticket);
-            var qrContainer = document. getElementById('qr-' + ticket.ticketId);
+            canvas.innerHTML = createTicketFrontHTML(ticket);
+            var qrContainer = document.getElementById('qr-' + ticket.ticketId);
             if (qrContainer && typeof QRCode !== 'undefined') {
-                new QRCode(qrContainer, { text: ticket.verifyUrl, width: 80, height: 80, colorDark: '#1a1a2e', colorLight: '#ffffff' });
+                new QRCode(qrContainer, { 
+                    text: getTicketLink(ticket), // UPDATED: Uses dynamic link
+                    width: 80, 
+                    height: 80, 
+                    colorDark: '#1a1a2e', 
+                    colorLight: '#ffffff' 
+                });
             }
             await sleep(50);
-            var frontCanvas = await html2canvas(canvas. firstChild, { scale: 3, useCORS: true });
+            var frontCanvas = await html2canvas(canvas.firstChild, { scale: 3, useCORS: true });
             var frontImg = frontCanvas.toDataURL('image/png');
             doc.addImage(frontImg, 'PNG', 0, 0, 5.5, 2);
             
@@ -890,8 +975,8 @@ async function downloadAsPdf() {
             doc.addPage([5.5, 2], 'landscape');
             canvas.innerHTML = createTicketBackHTML(ticket);
             await sleep(30);
-            var backCanvas = await html2canvas(canvas. firstChild, { scale: 3, useCORS: true });
-            var backImg = backCanvas. toDataURL('image/png');
+            var backCanvas = await html2canvas(canvas.firstChild, { scale: 3, useCORS: true });
+            var backImg = backCanvas.toDataURL('image/png');
             doc.addImage(backImg, 'PNG', 0, 0, 5.5, 2);
             
             btn.innerHTML = (i + 1) + '/' + ticketCount;
@@ -901,10 +986,10 @@ async function downloadAsPdf() {
         showNotification('Downloaded ' + ticketCount + ' tickets as PDF!', 'success');
         
     } catch (error) {
-        console. error('PDF error:', error);
-        showNotification('PDF failed: ' + error. message, 'error');
+        console.error('PDF error:', error);
+        showNotification('PDF failed: ' + error.message, 'error');
     } finally {
-        btn. disabled = false;
+        btn.disabled = false;
         btn.innerHTML = '📄 Download PDF';
     }
 }
@@ -913,7 +998,7 @@ async function downloadAsPdf() {
 // EXPORT CSV REPORT
 // ================================================
 function exportReport() {
-    if (allTickets. length === 0) {
+    if (allTickets.length === 0) {
         showNotification('No tickets to export!', 'error');
         return;
     }
@@ -921,17 +1006,17 @@ function exportReport() {
     var csv = 'Ticket ID,Status,Created At,Sold At,Used At,Price,Security Hash\n';
     for (var i = 0; i < allTickets.length; i++) {
         var t = allTickets[i];
-        csv += '"' + t.ticketId + '","' + t.status + '","' + (t.createdAt || '') + '","' + (t.soldAt || '') + '","' + (t. usedAt || '') + '","' + t.price + '","' + (t.securityHash || '') + '"\n';
+        csv += '"' + t.ticketId + '","' + t.status + '","' + (t.createdAt || '') + '","' + (t.soldAt || '') + '","' + (t.usedAt || '') + '","' + t.price + '","' + (t.securityHash || '') + '"\n';
     }
     
     var blob = new Blob([csv], { type: 'text/csv' });
     var url = URL.createObjectURL(blob);
     var a = document.createElement('a');
-    a. href = url;
-    a.download = 'EKINTABULI_Report_' + new Date(). toISOString(). split('T')[0] + '.csv';
+    a.href = url;
+    a.download = 'EKINTABULI_Report_' + new Date().toISOString().split('T')[0] + '.csv';
     a.click();
-    URL. revokeObjectURL(url);
-    showNotification('CSV report downloaded! ', 'success');
+    URL.revokeObjectURL(url);
+    showNotification('CSV report downloaded!', 'success');
 }
 
-console.log('Admin. js loaded successfully');
+console.log('Admin.js loaded successfully');
