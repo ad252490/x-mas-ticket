@@ -1,6 +1,8 @@
 /* ================================================
-   EKINTABULI Admin - FINAL GOLD/RED SECURE EDITION
-   Fixed Downloads: Non‑empty PNGs & PDFs
+   EKINTABULI Admin - Advanced Dashboard
+   - QR constrained to ticket margins
+   - Batch ZIP download (front-only, 100 at a time)
+   - Animated dashboard, charts, ms countdown
    ================================================ */
 
 // ================================================
@@ -13,7 +15,8 @@ const CONFIG = {
     ticketPrice: 10000,
     ticketWidth: 600,
     ticketHeight: 220,
-    printScale: 3
+    qrSize: 180,
+    captureScale: 4
 };
 
 // ================================================
@@ -24,8 +27,22 @@ let filteredTickets = [];
 let currentPage = 1;
 let isFirebaseConnected = false;
 
+// For animated numbers
+let prevStats = {
+    gen: 0,
+    sold: 0,
+    used: 0,
+    rev: 0,
+    downloaded: 0,
+    remaining: 0
+};
+
+// Charts
+let statusChart = null;
+let checkinChart = null;
+
 // ================================================
-// 3. UTILITY & HELPERS
+// 3. UTIL & HELPERS
 // ================================================
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 const formatCurrency = n => n.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
@@ -37,12 +54,169 @@ function showNotification(msg, type='success') {
     if(!c) return;
     const n = document.createElement('div');
     n.className = `notification`;
-    n.style.borderLeftColor = type==='error'?'#dc3545':'#d4af37';
+    n.style.borderLeftColor = type==='error'
+        ? '#dc3545'
+        : type==='warning'
+        ? '#ffcc33'
+        : '#d4af37';
     n.innerHTML = `<span>${type==='success'?'✅':type==='error'?'❌':'⚠️'}</span><span>${msg}</span>`;
     c.appendChild(n);
-    setTimeout(() => { n.style.opacity='0'; setTimeout(()=>n.remove(),300); }, 4000);
+    setTimeout(() => { 
+        n.style.opacity='0'; 
+        n.style.transform = 'translateY(4px)'; 
+        setTimeout(()=>n.remove(),300); 
+    }, 4000);
 }
 
+// Download tracking helpers
+function getExportedCount() {
+    return parseInt(localStorage.getItem('ekt_exported_count') || '0', 10);
+}
+
+function setExportedCount(n) {
+    localStorage.setItem('ekt_exported_count', String(n));
+}
+
+function setLastDownloadRange(startIndex, endIndex) {
+    const rangeStr = (endIndex === 0) ? '' : `${startIndex + 1}-${endIndex}`;
+    localStorage.setItem('ekt_last_download_range', rangeStr);
+}
+
+function getLastDownloadRange() {
+    return localStorage.getItem('ekt_last_download_range') || '';
+}
+
+// Activity log
+function logEvent(message, type = 'info') {
+    const list = document.getElementById('activityList');
+    if (!list) return;
+    const li = document.createElement('li');
+    li.className = `activity-item activity-${type}`;
+    li.innerHTML = `<span class="time">${new Date().toLocaleTimeString()}</span><span class="msg">${message}</span>`;
+    list.prepend(li);
+    while (list.children.length > 10) list.removeChild(list.lastChild);
+}
+
+// Animated numbers
+function animateNumber(id, from, to, formatFn = v => v.toString(), duration = 600) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    if (from === to) {
+        el.textContent = formatFn(to);
+        return;
+    }
+    const start = performance.now();
+    const diff = to - from;
+    function frame(now) {
+        const t = Math.min(1, (now - start) / duration);
+        const eased = t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t; // easeInOut
+        const current = from + diff * eased;
+        el.textContent = formatFn(Math.round(current));
+        if (t < 1) requestAnimationFrame(frame);
+    }
+    requestAnimationFrame(frame);
+}
+
+// Charts init
+function initChartsIfNeeded() {
+    const statusCtx = document.getElementById('statusChart')?.getContext('2d');
+    const checkinCtx = document.getElementById('checkinChart')?.getContext('2d');
+
+    if (statusCtx && !statusChart) {
+        statusChart = new Chart(statusCtx, {
+            type: 'doughnut',
+            data: {
+                labels: ['Generated', 'Sold', 'Used'],
+                datasets: [{
+                    data: [0, 0, 0],
+                    backgroundColor: ['#f59e0b', '#22c55e', '#64748b'],
+                    borderWidth: 0
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    legend: {
+                        position: 'bottom',
+                        labels: { color: '#e5e7eb', font: { size: 11 } }
+                    }
+                },
+                cutout: '60%'
+            }
+        });
+    }
+
+    if (checkinCtx && !checkinChart) {
+        checkinChart = new Chart(checkinCtx, {
+            type: 'line',
+            data: {
+                labels: [],
+                datasets: [{
+                    label: 'Check-ins',
+                    data: [],
+                    borderColor: '#22c55e',
+                    backgroundColor: 'rgba(34,197,94,0.15)',
+                    tension: 0.3,
+                    fill: true,
+                    pointRadius: 2
+                }]
+            },
+            options: {
+                responsive: true,
+                scales: {
+                    x: {
+                        ticks: { color: '#9ca3af', maxRotation: 0, autoSkip: true },
+                        grid: { color: 'rgba(148,163,184,0.15)' }
+                    },
+                    y: {
+                        ticks: { color: '#9ca3af' },
+                        grid: { color: 'rgba(148,163,184,0.15)' }
+                    }
+                },
+                plugins: {
+                    legend: {
+                        labels: { color: '#e5e7eb', font: { size: 11 } }
+                    }
+                }
+            }
+        });
+    }
+}
+
+function updateCharts() {
+    if (!statusChart || !checkinChart) {
+        initChartsIfNeeded();
+        if (!statusChart || !checkinChart) return;
+    }
+
+    // Status distribution
+    let gen = 0, sold = 0, used = 0;
+    allTickets.forEach(t => {
+        if (t.status === 'USED') used++;
+        else if (t.status === 'SOLD') sold++;
+        else gen++;
+    });
+    statusChart.data.datasets[0].data = [gen, sold, used];
+    statusChart.update('none');
+
+    // Approximate check-ins over time (by createdAt & status)
+    const usedTickets = allTickets.filter(t => t.status === 'USED' && t.createdAt?.seconds);
+    const byDay = {};
+    usedTickets.forEach(t => {
+        const d = new Date(t.createdAt.seconds * 1000);
+        const key = d.toISOString().substring(0, 10); // YYYY-MM-DD
+        byDay[key] = (byDay[key] || 0) + 1;
+    });
+    const sortedKeys = Object.keys(byDay).sort();
+    const labels = sortedKeys;
+    const values = sortedKeys.map(k => byDay[k]);
+
+    checkinChart.data.labels = labels;
+    checkinChart.data.datasets[0].data = values;
+    checkinChart.update('none');
+}
+
+// Dashboard update
 function updateDashboard() {
     const s = { gen:0, sold:0, used:0, rev:0 };
     allTickets.forEach(t => {
@@ -54,17 +228,96 @@ function updateDashboard() {
         if(t.status === 'USED') s.used++;
     });
 
+    // Animated stats
+    animateNumber('statGenerated', prevStats.gen, s.gen, v => v.toLocaleString());
+    animateNumber('statSold', prevStats.sold, s.sold, v => v.toLocaleString());
+    animateNumber('statUsed', prevStats.used, s.used, v => v.toLocaleString());
+    animateNumber('statRevenue', prevStats.rev, s.rev, v => formatCurrency(v));
+
+    prevStats.gen = s.gen;
+    prevStats.sold = s.sold;
+    prevStats.used = s.used;
+    prevStats.rev = s.rev;
+
     const g = id => document.getElementById(id);
-    if (g('statGenerated')) g('statGenerated').textContent = s.gen;
-    if (g('statSold')) g('statSold').textContent = s.sold;
-    if (g('statUsed')) g('statUsed').textContent = s.used;
-    if (g('statRevenue')) g('statRevenue').textContent = formatCurrency(s.rev);
+
+    // Attendance rate
+    if (g('attendanceRate')) {
+        const rate = s.sold > 0 ? Math.round((s.used / s.sold) * 100) : 0;
+        g('attendanceRate').textContent = `${rate}% Attendance`;
+    }
+
+    // Download / export stats
+    const exportedCount = getExportedCount();
+    const lastRange = getLastDownloadRange();
+
+    animateNumber('statDownloaded', prevStats.downloaded, exportedCount, v => v.toLocaleString());
+    prevStats.downloaded = exportedCount;
+
+    if (g('statDownloadedRange')) g('statDownloadedRange').textContent = lastRange || '—';
+
+    const totalGenerated = s.gen;
+    const remainingToDownload = Math.max(0, totalGenerated - exportedCount);
+    const progressPct = totalGenerated > 0
+        ? Math.round((exportedCount / totalGenerated) * 100)
+        : 0;
+
+    animateNumber('statRemainingToDownload', prevStats.remaining, remainingToDownload, v => v.toLocaleString());
+    prevStats.remaining = remainingToDownload;
+
+    if (g('statDownloadProgress')) g('statDownloadProgress').textContent = `${progressPct}%`;
+
+    // Next batch hint
+    const hint = document.getElementById('nextBatchHint');
+    if (hint) {
+        const BATCH_SIZE = 100;
+        if (totalGenerated === 0) {
+            hint.textContent = 'Generate tickets to start downloads.';
+        } else if (exportedCount >= totalGenerated) {
+            hint.textContent = 'No more tickets to download.';
+        } else {
+            const nextStart = exportedCount + 1;
+            const nextEnd = Math.min(exportedCount + BATCH_SIZE, totalGenerated);
+            hint.textContent = `Next ZIP: tickets ${nextStart}–${nextEnd}.`;
+        }
+    }
 
     const hasData = s.gen > 0;
     ['downloadPdfBtn', 'downloadZipBtn', 'exportBtn'].forEach(id => {
         const b = document.getElementById(id);
         if (b) b.disabled = !hasData;
     });
+
+    // Update charts
+    updateCharts();
+}
+
+// Countdown with ms
+function updateCountdown() {
+    const target = new Date('2025-12-25T18:00:00'); // Event time
+    const now = new Date();
+    const diffMs = target - now;
+    const elMain = document.getElementById('statCountdown');
+    const elSub = document.getElementById('statCountdownSub');
+    if (!elMain) return;
+
+    if (diffMs <= 0) {
+        elMain.textContent = 'Event Started';
+        if (elSub) elSub.textContent = '';
+        return;
+    }
+
+    const totalSec = diffMs / 1000;
+    const days = Math.floor(totalSec / 86400);
+    const hours = Math.floor((totalSec % 86400) / 3600);
+    const mins = Math.floor((totalSec % 3600) / 60);
+    const secs = Math.floor(totalSec % 60);
+    const ms = Math.floor(diffMs % 1000 / 10); // hundredths
+
+    elMain.textContent = `${days}d ${hours}h ${mins}m`;
+    if (elSub) {
+        elSub.textContent = `${secs.toString().padStart(2,'0')}.${ms.toString().padStart(2,'0')}s remaining`;
+    }
 }
 
 // Wait until QRCode has actually rendered an <img> or <canvas>
@@ -77,11 +330,25 @@ function waitForQRCodeRendered(container) {
             const img = container.querySelector('img,canvas');
             if (img) {
                 obs.disconnect();
-                resolve();
+                setTimeout(resolve, 20);
             }
         });
         obs.observe(container, { childList: true, subtree: true });
+        setTimeout(() => { obs.disconnect(); resolve(); }, 2000);
     });
+}
+
+// Compute QR size
+function getQrSizeForTicket() {
+    const rightWidth = Math.floor(CONFIG.ticketWidth * 0.28);
+    const whiteBoxPadding = 8;
+    const sideMargin = 12;
+    const availableWidth = Math.max(0, rightWidth - (whiteBoxPadding * 2) - sideMargin);
+    const reservedVertical = 30 + 10;
+    const availableHeight = Math.max(0, CONFIG.ticketHeight - reservedVertical);
+    const computed = Math.min(CONFIG.qrSize, availableWidth, availableHeight);
+    const size = Math.max(40, Math.floor(computed));
+    return size;
 }
 
 // ================================================
@@ -116,7 +383,6 @@ document.addEventListener('DOMContentLoaded', () => {
         ticketCanvas.style.left = '-10000px';
         ticketCanvas.style.zIndex = '-1';
         ticketCanvas.style.visibility = 'visible';
-        // do NOT use display:none
     }
 
     if(typeof firebase !== 'undefined' && typeof db !== 'undefined' && db) {
@@ -137,6 +403,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (byId('downloadPdfBtn')) byId('downloadPdfBtn').addEventListener('click', downloadDoubleSidedPdf);
     if (byId('downloadZipBtn')) byId('downloadZipBtn').addEventListener('click', downloadZip);
     if (byId('exportBtn')) byId('exportBtn').addEventListener('click', exportCSV);
+    if (byId('resetDownloadBtn')) byId('resetDownloadBtn').addEventListener('click', resetDownloadProgress);
 
     // Filters
     if (byId('searchTicket')) byId('searchTicket').addEventListener('keyup', () => { currentPage=1; renderTable(); });
@@ -152,9 +419,16 @@ document.addEventListener('DOMContentLoaded', () => {
     const local = localStorage.getItem('ekt_data');
     if(local) {
         allTickets = JSON.parse(local);
+        initChartsIfNeeded();
         updateDashboard();
         renderTable();
+    } else {
+        initChartsIfNeeded();
     }
+
+    // Start countdown (update ~every 60ms for ms display)
+    updateCountdown();
+    setInterval(updateCountdown, 60);
 });
 
 function startRealTimeSync() {
@@ -176,7 +450,7 @@ function startRealTimeSync() {
 // ================================================
 async function generateTickets() {
     if(!isFirebaseConnected) return alert("Connect to internet.");
-    const count = parseInt(document.getElementById('ticketCount').value) || 400;
+    const count = parseInt(document.getElementById('ticketCount').value) || 500;
     if(allTickets.length > 0 && !confirm("Overwrite database?")) return;
 
     const btn = document.getElementById('generateBtn');
@@ -217,6 +491,13 @@ async function generateTickets() {
             if (bar) bar.style.width = `${50 + ((i+1)/batches.length*50)}%`;
         }
         if (txt) txt.textContent = 'Done!';
+
+        // Reset download tracking when regenerating tickets
+        setExportedCount(0);
+        setLastDownloadRange(0, 0);
+        prevStats = { gen: 0, sold: 0, used: 0, rev: 0, downloaded: 0, remaining: 0 };
+
+        logEvent(`Generated ${count} tickets.`, 'success');
         showNotification(`Created ${count} tickets.`);
     } catch(e) {
         console.error(e);
@@ -233,22 +514,42 @@ async function clearDatabase() {
     if(!confirm("Delete all tickets?")) return;
     localStorage.removeItem('ekt_data');
     allTickets = [];
+
+    // Reset download tracking
+    localStorage.removeItem('ekt_exported_count');
+    localStorage.removeItem('ekt_last_download_range');
+    prevStats = { gen: 0, sold: 0, used: 0, rev: 0, downloaded: 0, remaining: 0 };
+
     const q = await db.collection('tickets').get();
     const batch = db.batch();
     q.docs.forEach(d => batch.delete(d.ref));
     await batch.commit();
     updateDashboard();
     renderTable();
+    logEvent('Database reset and all tickets removed.', 'warning');
+    showNotification('Database reset.', 'warning');
+}
+
+function resetDownloadProgress() {
+    if (!confirm('Reset download progress? This will allow downloading all tickets again.')) return;
+    setExportedCount(0);
+    setLastDownloadRange(0, 0);
+    prevStats.downloaded = 0;
+    prevStats.remaining = allTickets.length;
+    updateDashboard();
+    logEvent('Download progress reset.', 'info');
+    showNotification('Download progress reset.');
 }
 
 // ================================================
-// 7. PREMIUM DESIGN (Red + Watermarks)
+// 7. DESIGN (Red + Watermarks) with QR constrained
 // ================================================
 const watermarkSVG = `data:image/svg+xml;utf8,%3Csvg width='100' height='100' viewBox='0 0 100 100' xmlns='http://www.w3.org/2000/svg'%3E%3Cg transform='translate(50,50) rotate(-45)'%3E%3Ctext text-anchor='middle' font-family='Arial' font-size='10' fill='rgba(255,255,255,0.08)' font-weight='bold'%3EOFFICIAL ORIGINAL%3C/text%3E%3C/g%3E%3C/svg%3E`;
 
 const guilloche = `data:image/svg+xml,%3Csvg width='40' height='40' viewBox='0 0 40 40' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M0 20 Q 10 0 20 20 T 40 20' fill='none' stroke='rgba(255,215,0,0.1)' stroke-width='0.5'/%3E%3C/svg%3E`;
 
 function createTicketFront(t) {
+    const qrSize = getQrSizeForTicket();
     return `
     <div style="width:${CONFIG.ticketWidth}px; height:${CONFIG.ticketHeight}px; 
         background: #0a0a0a; 
@@ -295,20 +596,11 @@ function createTicketFront(t) {
         </div>
 
         <div style="width: 28%; background: #151515; position: relative; display:flex; flex-direction:column; 
-            align-items:center; justify-content:center; z-index: 5;">
-            
-            <div style="position:absolute; inset:0; background-image: url('${watermarkSVG}'); opacity:0.5; pointer-events:none;"></div>
-
-            <div style="font-size:12px; font-weight:900; color:#fff; letter-spacing:1px; margin-bottom:8px; z-index:2;">SCAN ME</div>
-            
-            <div style="background:white; padding:4px; border-radius:6px; z-index:2;">
-                <div id="qr-${t.ticketId}"></div>
+            align-items:center; justify-content:center; z-index: 6; padding:10px;">
+            <div style="background:white; padding:8px; border-radius:8px; z-index:8; display:flex; align-items:center; justify-content:center;">
+                <div id="qr-${t.ticketId}" style="width:${qrSize}px; height:${qrSize}px; display:block;"></div>
             </div>
-            
-            <div style="font-family:monospace; font-size:10px; color:#666; font-weight:bold; margin-top:6px; z-index:2;">${t.ticketId}</div>
-
-            <div style="position:absolute; top:-10px; left:-10px; width:20px; height:20px; background:#0f1015; border-radius:50%; z-index:10;"></div>
-            <div style="position:absolute; bottom:-10px; left:-10px; width:20px; height:20px; background:#0f1015; border-radius:50%; z-index:10;"></div>
+            <div style="font-family:monospace; font-size:10px; color:#666; font-weight:bold; margin-top:8px; z-index:9;">${t.ticketId}</div>
         </div>
     </div>`;
 }
@@ -338,10 +630,11 @@ function createTicketBack(t) {
 }
 
 // ================================================
-// 8. DOWNLOADS (Dual ZIP + PDF) — FIXED
+// 8. DOWNLOADS (ZIP + PDF)
 // ================================================
 async function downloadZip() {
-    if(!allTickets.length) return;
+    if (!allTickets.length) return;
+
     const btn = document.getElementById('downloadZipBtn');
     const canvasWrapper = document.getElementById('ticketCanvas');
     if (!canvasWrapper) {
@@ -353,59 +646,80 @@ async function downloadZip() {
     btn.innerHTML = 'Creating Zip...';
 
     try {
+        const totalTickets = allTickets.length;
+        const alreadyExported = getExportedCount();
+        const BATCH_SIZE = 100;
+
+        if (alreadyExported >= totalTickets) {
+            showNotification('All tickets have already been exported.', 'warning');
+            btn.disabled = false;
+            btn.innerHTML = '📦 ZIP';
+            return;
+        }
+
+        const startIndex = alreadyExported;
+        const endIndex = Math.min(startIndex + BATCH_SIZE, totalTickets);
+        const batchTickets = allTickets.slice(startIndex, endIndex);
+        const batchNumber = Math.floor(startIndex / BATCH_SIZE) + 1;
+
         const zip = new JSZip();
-        const folder = zip.folder("Tickets_Front_Back");
-        const count = Math.min(allTickets.length, 100); // safety limit
+        const folderName = `Tickets_Front_Batch_${batchNumber}`;
+        const folder = zip.folder(folderName);
 
-        for(let i=0; i<count; i++) {
-            const t = allTickets[i];
+        btn.innerHTML = `Batch ${batchNumber}: preparing...`;
 
-            // FRONT
+        for (let i = 0; i < batchTickets.length; i++) {
+            const t = batchTickets[i];
+
             canvasWrapper.innerHTML = createTicketFront(t);
-            const qrContainerFront = document.getElementById('qr-'+t.ticketId);
+            const qrContainerFront = document.getElementById('qr-' + t.ticketId);
+            const qrSize = getQrSizeForTicket();
             new QRCode(qrContainerFront, {
                 text: getTicketLink(t),
-                width: 75,
-                height: 75,
+                width: qrSize,
+                height: qrSize,
                 colorDark: "#000000",
                 colorLight: "#ffffff",
-                correctLevel: QRCode.CorrectLevel.Q
+                correctLevel: QRCode.CorrectLevel.H
             });
             await waitForQRCodeRendered(qrContainerFront);
 
             const elFront = canvasWrapper.firstElementChild;
-            console.log('FRONT size', elFront.offsetWidth, elFront.offsetHeight);
-            const cvsFront = await html2canvas(elFront, { scale: 2, useCORS: true });
+            const cvsFront = await html2canvas(elFront, {
+                scale: CONFIG.captureScale,
+                useCORS: true,
+                allowTaint: false
+            });
+
             folder.file(
                 `${t.ticketId}_FRONT.png`,
                 cvsFront.toDataURL('image/png').split(',')[1],
                 { base64: true }
             );
 
-            // BACK
-            canvasWrapper.innerHTML = createTicketBack(t);
-            const elBack = canvasWrapper.firstElementChild;
-            console.log('BACK size', elBack.offsetWidth, elBack.offsetHeight);
-            const cvsBack = await html2canvas(elBack, { scale: 2, useCORS: true });
-            folder.file(
-                `${t.ticketId}_BACK.png`,
-                cvsBack.toDataURL('image/png').split(',')[1],
-                { base64: true }
-            );
-
-            if(i % 10 === 0) btn.innerHTML = `Zipping ${i}/${count}...`;
+            if (i % 10 === 0) {
+                btn.innerHTML = `Batch ${batchNumber}: ${i + 1}/${batchTickets.length}...`;
+            }
         }
 
-        const content = await zip.generateAsync({ type:"blob" });
-        saveAs(content, "EKINTABULI_All_Tickets.zip");
-        showNotification("Zip Downloaded!");
-    } catch(e) {
+        const content = await zip.generateAsync({ type: "blob" });
+        saveAs(content, `EKINTABULI_Tickets_Front_Batch_${batchNumber}.zip`);
+
+        const newExportedCount = endIndex;
+        setExportedCount(newExportedCount);
+        setLastDownloadRange(startIndex, endIndex);
+
+        updateDashboard();
+
+        logEvent(`Downloaded batch ${batchNumber} (${batchTickets.length} tickets).`, 'success');
+        showNotification(`Downloaded batch ${batchNumber} (${batchTickets.length} tickets).`);
+    } catch (e) {
         console.error(e);
         alert("Zip Error");
     } finally {
         btn.disabled = false;
         btn.innerHTML = '📦 ZIP';
-        canvasWrapper.innerHTML = '';
+        if (canvasWrapper) canvasWrapper.innerHTML = '';
     }
 }
 
@@ -422,7 +736,8 @@ async function downloadDoubleSidedPdf() {
     try {
         const { jsPDF } = window.jspdf;
         const doc = new jsPDF('p', 'mm', 'a4');
-        const tW = 60, tH = 24, cols = 3, rows = 11, perPage = cols * rows; // 33 tickets per front/back
+
+        const tW = 60, tH = 24, cols = 3, rows = 11, perPage = cols * rows;
 
         const chunks = [];
         for(let i=0; i<allTickets.length; i+=perPage) {
@@ -432,38 +747,37 @@ async function downloadDoubleSidedPdf() {
         for(let p=0; p<chunks.length; p++) {
             const data = chunks[p];
 
-            // FRONT PAGE
             if(p>0) doc.addPage();
             btn.innerHTML = `Page ${p+1} Front...`;
             let x=10, y=10, c=0;
             for(let t of data) {
                 canvasWrapper.innerHTML = createTicketFront(t);
                 const qrContainer = document.getElementById('qr-'+t.ticketId);
+                const qrSize = getQrSizeForTicket();
                 new QRCode(qrContainer, {
                     text: getTicketLink(t),
-                    width: 75,
-                    height: 75,
+                    width: qrSize,
+                    height: qrSize,
                     colorDark: "#000000",
                     colorLight: "#ffffff",
-                    correctLevel: QRCode.CorrectLevel.Q
+                    correctLevel: QRCode.CorrectLevel.H
                 });
                 await waitForQRCodeRendered(qrContainer);
                 const el = canvasWrapper.firstElementChild;
-                const imgCanvas = await html2canvas(el, { scale: 3, useCORS: true });
+                const imgCanvas = await html2canvas(el, { scale: CONFIG.captureScale, useCORS: true, allowTaint: false });
                 doc.addImage(imgCanvas.toDataURL('image/png'), 'PNG', x, y, tW, tH);
                 x += tW + 2;
                 c++;
                 if(c % cols === 0) { x = 10; y += tH + 2; }
             }
 
-            // BACK PAGE
             doc.addPage();
             btn.innerHTML = `Page ${p+1} Back...`;
             x=10; y=10; c=0;
             for(let t of data) {
                 canvasWrapper.innerHTML = createTicketBack(t);
                 const el = canvasWrapper.firstElementChild;
-                const imgCanvas = await html2canvas(el, { scale: 3, useCORS: true });
+                const imgCanvas = await html2canvas(el, { scale: CONFIG.captureScale, useCORS: true, allowTaint: false });
                 doc.addImage(imgCanvas.toDataURL('image/png'), 'PNG', x, y, tW, tH);
                 x += tW + 2;
                 c++;
@@ -473,6 +787,7 @@ async function downloadDoubleSidedPdf() {
 
         doc.save('Tickets.pdf');
         showNotification("PDF Ready");
+        logEvent('Downloaded PDF of tickets.', 'info');
     } catch(e) {
         console.error(e);
         alert('PDF Error');
@@ -484,7 +799,7 @@ async function downloadDoubleSidedPdf() {
 }
 
 // ================================================
-// 9. CSV EXPORT, TABLE & PREVIEW
+// 9. CSV, TABLE & PREVIEW
 // ================================================
 function exportCSV() {
     const rows = [["Ticket ID", "Status", "Price", "Created At"]];
@@ -499,6 +814,7 @@ function exportCSV() {
     link.href = encodeURI(csvContent);
     link.download = "ticket_report.csv";
     link.click();
+    logEvent('Exported ticket report CSV.', 'info');
 }
 
 function renderTable() {
@@ -535,8 +851,8 @@ function renderTable() {
             <td><code>${t.ticketId}</code></td>
             <td><span class="badge" 
                 style="padding:4px 8px; border-radius:12px; font-size:10px; 
-                background:${t.status==='SOLD'?'#198754':t.status==='USED'?'#666':'#d4af3733'}; 
-                color:${t.status==='SOLD'?'#fff':t.status==='USED'?'#ccc':'#d4af37'};">
+                background:${t.status==='SOLD'?'#15803d':t.status==='USED'?'#4b5563':'rgba(234,179,8,0.15)'}; 
+                color:${t.status==='SOLD'?'#ecfdf3':t.status==='USED'?'#e5e7eb':'#facc15'};">
                 ${t.status}</span></td>
             <td>${formatCurrency(t.price)}</td>
             <td><button class="btn-secondary" onclick="showPreview('${t.ticketId}')">View</button></td>
@@ -570,17 +886,19 @@ function showPreview(tid) {
     if (backDiv) backDiv.innerHTML = createTicketBack(t);
     if (modal) modal.classList.add('active');
 
-    setTimeout(() => {
+    setTimeout(async () => {
         const qrContainer = document.getElementById('qr-'+t.ticketId);
         if (qrContainer) {
+            const qrSize = getQrSizeForTicket();
             new QRCode(qrContainer, {
                 text: getTicketLink(t),
-                width: 75,
-                height: 75,
+                width: qrSize,
+                height: qrSize,
                 colorDark: "#000000",
                 colorLight: "#ffffff",
-                correctLevel: QRCode.CorrectLevel.Q
+                correctLevel: QRCode.CorrectLevel.H
             });
+            await waitForQRCodeRendered(qrContainer);
         }
     }, 100);
 }
